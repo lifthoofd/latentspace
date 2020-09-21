@@ -130,3 +130,15 @@ dmypy.json
 
 # PyCharm
 .idea/
+
+*.db
+datasets/
+pretrained_temp/
+main_temp.py
+sn_test.py
+training_checkpoints/
+summary/
+samples/
+projects/
+logs/
+images/

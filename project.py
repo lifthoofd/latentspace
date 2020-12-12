@@ -50,11 +50,15 @@ class Project:
                 images_path = os.path.join(path, 'images')
                 if not os.path.isdir(images_path):
                     os.mkdir(images_path)
+                summary_path = os.path.join(path, 'summary')
+                if not os.path.isdir(summary_path):
+                    os.mkdir(summary_path)
 
                 self.data['path'] = path
                 self.data['gan']['ckpt_path'] = ckpt_path
                 self.data['gan']['samples_path'] = samples_path
                 self.data['gan']['images_path'] = images_path
+                self.data['gan']['summary_path'] = summary_path
 
                 json_file.seek(0)
                 json.dump(self.data, json_file)

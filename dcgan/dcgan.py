@@ -1,13 +1,18 @@
 import os
 import time
 from random import randint
-import gc
+# import gc
 import tensorflow as tf
 import numpy as np
 import datetime
+from functools import partial
+import subprocess
 
 from dcgan.dataset import DatasetPipeline
 import dcgan.models as models
+
+
+SUMMARY_FREQ = 4
 
 
 class DCGAN:
@@ -32,6 +37,9 @@ class DCGAN:
         self.ckpt_path = str(config['ckpt_path'])
         self.samples_path = str(config['samples_path'])
         self.images_path = os.path.join(str(config['images_path']), 'train')
+        self.summary_path = str(config['summary_path'])
+        self.n_critics = int(config['n_critics'])
+        self.gp_mult = float(config['gp_mult'])
         if not os.path.isdir(self.images_path):
             os.mkdir(self.images_path)
         self.is_training = False
@@ -54,7 +62,7 @@ class DCGAN:
         # make generator
         self.generator = models.make_generator_model(self.num_labels, self.z_dim, self.weight_init, self.bn_momentum, self.image_size, self.aspect, self.filters)
         # make discriminator
-        self.discriminator = models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size, self.lr_slope)
+        self.discriminator = models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size, self.lr_slope, self.aspect, self.filters)
 
         # print summaries
         self.generator.summary()
@@ -73,27 +81,12 @@ class DCGAN:
                                               discriminator=self.discriminator)
         self.checkpoint_manager = tf.train.CheckpointManager(self.checkpoint, self.ckpt_path, max_to_keep=10)
 
+        self.summary_writer = tf.summary.create_file_writer(self.summary_path)
+
         # restore checkpoint if present
         if self.checkpoint_manager.latest_checkpoint:
             self.checkpoint.restore(self.checkpoint_manager.latest_checkpoint)
             print('restored latest checkpoint {}'.format(self.checkpoint_manager.latest_checkpoint))
-
-    # def set_config(self, config):
-    #     self.num_epochs = config['num_epochs']
-    #     self.batch_size = config['batch_size']
-    #     self.z_dim = config['z_dim']
-    #     self.learning_rate_gen = config['learning_rate_gen']
-    #     self.learning_rate_disc = config['learning_rate_disc']
-    #     self.bn_momentum = config['batch_norm_momentum']
-    #     self.lr_slope = config['lrelu_slope']
-    #     self.log_freq = config['log_freq']
-    #     self.checkpoint_freq = config['checkpoint_freq']
-    #     self.num_images_in_row = config['num_images_in_row']
-    #     self.dataset_path = config['dataset_path']
-    #     self.dataset_name = config['dataset_name']
-    #     self.image_size = config['image_size']
-    #     self.ckpt_path = config['ckpt_path']
-    #     self.samples_path = config['samples_path']
 
     @staticmethod
     def smooth_positive_labels(y):
@@ -121,23 +114,31 @@ class DCGAN:
         outputs = tf.stack(op_list)
         return outputs
 
-    def discriminator_loss(self, real_output, fake_output):
-        real_output_noise = self.noisy_labels(tf.ones_like(real_output), 0.05)
-        fake_output_noise = self.noisy_labels(tf.zeros_like(fake_output), 0.05)
+    @staticmethod
+    def discriminator_loss(real_output, fake_output):
+        fake_loss = tf.reduce_mean(fake_output)
+        real_loss = tf.reduce_mean(real_output)
+        return fake_loss - real_loss
 
-        real_output_smooth = self.smooth_positive_labels(real_output_noise)
-        fake_output_smooth = self.smooth_negative_labels(fake_output_noise)
+    @staticmethod
+    def generator_loss(fake_output):
+        fake_loss = -tf.reduce_mean(fake_output)
+        return fake_loss
 
-        real_loss = self.cross_entropy(tf.ones_like(real_output_smooth), real_output)
-        fake_loss = self.cross_entropy(tf.zeros_like(fake_output_smooth), fake_output)
-        total_loss = real_loss + fake_loss
+    def gradient_penalty(self, f, real, fake, labels):
+        alpha = tf.random.uniform([self.batch_size, 1, 1, 1], 0., 1.)
+        diff = fake - real
+        inter = real + (alpha * diff)
 
-        return total_loss
+        with tf.GradientTape() as t:
+            t.watch(inter)
+            pred = f([inter, labels])
 
-    def generator_loss(self, fake_output):
-        fake_output_smooth = self.smooth_negative_labels(tf.ones_like(fake_output))
+        grad = t.gradient(pred, [inter])[0]
+        slopes = tf.sqrt(tf.reduce_sum(tf.square(grad), axis=[1, 2, 3]))
+        gp = tf.reduce_mean((slopes - 1.) ** 2)
 
-        return self.cross_entropy(tf.ones_like(fake_output_smooth), fake_output)
+        return gp
 
     @staticmethod
     def one_hot(labels, num_labels):
@@ -152,29 +153,63 @@ class DCGAN:
         expanded_labels = one_hot_labels * np.ones([M, img_size[0], img_size[1], num_labels], dtype=np.float32)
         return one_hot_labels, expanded_labels
 
-    @tf.function
-    def train_step(self, gen_z, gen_y, gen_y_expanded, disc_x, disc_y):
-        with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-            generated_images = self.generator([gen_z, gen_y], training=True)
+    def train_step(self, batch):
+        imgs, labels = batch
+        y_real = self.one_hot(labels, self.num_labels)
+        _, y_real_expanded = self.expand_labels(labels, self.num_labels)
 
-            real_output = self.discriminator([disc_x, disc_y], training=True)
-            fake_output = self.discriminator([generated_images, gen_y_expanded], training=True)
+        disc_loss = 0
 
-            gen_loss = self.generator_loss(fake_output)
-            disc_loss = self.discriminator_loss(real_output, fake_output)
+        for _ in range(self.n_critics):
+            disc_loss = self.train_d(imgs, y_real, y_real_expanded)
 
-        gradients_of_generator = gen_tape.gradient(gen_loss, self.generator.trainable_variables)
-        gradients_of_discriminator = disc_tape.gradient(disc_loss, self.discriminator.trainable_variables)
-
-        self.generator_optimizer.apply_gradients(zip(gradients_of_generator, self.generator.trainable_variables))
-        self.discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, self.discriminator.trainable_variables))
+        gen_loss = self.train_g()
 
         return gen_loss, disc_loss
+
+    @tf.function
+    def train_g(self):
+        z = tf.random.normal((self.batch_size, 1, 1, self.z_dim))
+        labels = [randint(0, self.num_labels - 1) for _ in range(self.batch_size)]
+        y = self.one_hot(labels, self.num_labels)
+        _, y_expanded = self.expand_labels(labels, self.num_labels)
+
+        with tf.GradientTape() as gen_tape:
+            x_fake = self.generator([z, y], training=True)
+            fake_logits = self.discriminator([x_fake, y_expanded], training=True)
+            loss = self.generator_loss(fake_logits)
+
+        grad = gen_tape.gradient(loss, self.generator.trainable_variables)
+        self.generator_optimizer.apply_gradients(zip(grad, self.generator.trainable_variables))
+
+        return loss
+
+    @tf.function
+    def train_d(self, x_real, y_real, y_real_expanded):
+        z = tf.random.normal((self.batch_size, 1, 1, self.z_dim))
+
+        with tf.GradientTape() as disc_tape:
+            x_fake = self.generator([z, y_real], training=True)
+            fake_logits = self.discriminator([x_fake, y_real_expanded], training=True)
+
+            real_logits = self.discriminator([x_real, y_real_expanded], training=True)
+            cost = self.discriminator_loss(real_logits, fake_logits)
+            gp = self.gradient_penalty(partial(self.discriminator, training=True), x_real, x_fake, y_real_expanded)
+            cost += self.gp_mult * gp
+
+        grad = disc_tape.gradient(cost, self.discriminator.trainable_variables)
+        self.discriminator_optimizer.apply_gradients(zip(grad, self.discriminator.trainable_variables))
+        return cost
 
     def train(self):
         epoch_offset = self.checkpoint.epoch.numpy()
         seed = self.generate_z(self.num_labels)
         self.is_training = True
+        gen_loss_mean = tf.keras.metrics.Mean(name='generator loss')
+        disc_loss_mean = tf.keras.metrics.Mean(name='discriminator loss')
+
+        # start tensorboard
+        tensorboard = subprocess.Popen(['tensorboard', '--logdir', self.summary_path, '--bind_all'])
 
         for epoch in range(epoch_offset, self.num_epochs):
             # print(self.is_training)
@@ -183,21 +218,29 @@ class DCGAN:
 
                 for batch in self.dataset:
                     step = self.checkpoint.step.numpy()
-                    images, labels = batch
-                    _, labels_expanded = self.expand_labels(labels, self.num_labels)
-                    gen_z = tf.random.normal([self.batch_size, 1, 1, self.z_dim])
-                    labels = [randint(0, self.num_labels - 1) for i in range(self.batch_size)]
-                    gen_y, gen_y_expanded = self.expand_labels(labels, self.num_labels)
 
-                    gen_loss, disc_loss = self.train_step(gen_z, gen_y, gen_y_expanded, images, labels_expanded)
+                    gen_loss, disc_loss = self.train_step(batch)
 
                     self.losses['gen'] = float(gen_loss.numpy())
                     self.losses['disc'] = float(disc_loss.numpy())
+                    gen_loss_mean.update_state(gen_loss)
+                    disc_loss_mean.update_state(disc_loss)
+
                     if step % self.log_freq == 0:
                         # print(self.is_training)
                         print('epoch {:04d} | step {:08d} | generator loss: {} | discriminator loss {}'.format(epoch, step,
                                                                                                                gen_loss,
                                                                                                                disc_loss))
+                    if step % SUMMARY_FREQ == 0:
+                        with self.summary_writer.as_default():
+                            tf.summary.scalar('generator loss', gen_loss_mean.result(), step=step)
+                            tf.summary.scalar('discriminator loss', disc_loss_mean.result(), step=step)
+
+                        gen_loss_mean.reset_states()
+                        disc_loss_mean.reset_states()
+
+                        self.summary_writer.flush()
+
                     self.progress['epoch'] = int(epoch)
                     self.progress['step'] = int(step)
                     self.checkpoint.step.assign_add(1)
@@ -211,14 +254,13 @@ class DCGAN:
                 if (epoch + 1) % self.checkpoint_freq == 0:
                     ckpt_save_path = self.checkpoint_manager.save()
 
-                gc.collect()
-
                 self.checkpoint.epoch.assign(epoch)
 
                 print('Time for epoch {} is {} sec'.format(epoch, time.time() - start))
 
         self.generate_and_save_images(self.generator, self.num_epochs, self.num_labels, seed)
         self.is_training = False
+        tensorboard.terminate()
 
     def stop_train(self):
         self.is_training = False
@@ -229,7 +271,6 @@ class DCGAN:
 
     def generate_image(self, z, y):
         image = self.generate_samples(self.generator, z, y)
-        # image = image * 127.5 + 127.5
         image = np.array(image)
         return image
 
@@ -237,7 +278,6 @@ class DCGAN:
         zs = []
         for i in range(num_labels):
             z = tf.random.normal([self.num_images_in_row, 1, 1, self.z_dim])
-            # print(z.dtype)
             zs.append(z)
 
         return zs

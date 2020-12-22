@@ -139,6 +139,6 @@ sn_test.py
 training_checkpoints/
 summary/
 samples/
-projects/
+projects/*/
 logs/
 images/

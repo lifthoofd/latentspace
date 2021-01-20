@@ -15,7 +15,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
 
     if aspect_ratio == ASPECT_16_9:
         start_size = (9, 16)
-        steps = int(log(image_size[1], 2)) - int(log(16, 2))
+        steps = int(log(image_size[1], 2)) - int(log(16, 2)) + 1
         dim_mul = 16
     elif aspect_ratio == ASPECT_16_10:
         start_size = (5, 8)
@@ -34,7 +34,10 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
 
     for i in range(steps):
         dim_mul //= 2
-        x = layers.Conv2DTranspose(dim * dim_mul, (4, 4), strides=(2, 2), padding='same')(x)
+        if i == steps - 1:
+            x = layers.Conv2DTranspose(dim * dim_mul, (4, 4), strides=(1, 1), padding='same')(x)
+        else:
+            x = layers.Conv2DTranspose(dim * dim_mul, (4, 4), strides=(2, 2), padding='same')(x)
         x = layers.BatchNormalization(momentum=bn_momentum)(x)
         x = layers.ReLU()(x)
 

@@ -50,7 +50,7 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
     x = layers.concatenate([im, y], axis=3)
 
     if aspect_ratio == ASPECT_16_9:
-        steps = (int(log(image_size[1], 2)) - int(log(16, 2))) + 1
+        steps = (int(log(image_size[1], 2)) - int(log(16, 2))) + 2
     elif aspect_ratio == ASPECT_16_10:
         steps = int(log(image_size[1], 2)) - int(log(8, 2))
     else:

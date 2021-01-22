@@ -91,8 +91,7 @@ class DCGAN:
                                               generator_optimizer=self.generator_optimizer,
                                               discriminator_optimizer=self.discriminator_optimizer,
                                               generator=self.generator,
-                                              discriminator=self.discriminator,
-                                              weight_init=self.weight_init)
+                                              discriminator=self.discriminator)
         self.checkpoint_manager = tf.train.CheckpointManager(self.checkpoint, self.ckpt_path, max_to_keep=10)
 
         self.summary_writer = tf.summary.create_file_writer(self.summary_path)

@@ -35,13 +35,13 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     for i in range(steps):
         dim_mul //= 2
         if i == 0 and aspect_ratio == ASPECT_16_9:
-            x = layers.Conv2DTranspose(dim * dim_mul, (4, 4), strides=(3, 2), padding='same')(x)
+            x = layers.Conv2DTranspose(dim * dim_mul, (4, 4), strides=(3, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
         else:
-            x = layers.Conv2DTranspose(dim * dim_mul, (4, 4), strides=(2, 2), padding='same')(x)
+            x = layers.Conv2DTranspose(dim * dim_mul, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
         x = layers.BatchNormalization(momentum=bn_momentum)(x)
         x = layers.ReLU()(x)
 
-    x = layers.Conv2DTranspose(3, (4, 4), strides=(1, 1), padding='same', activation='tanh')(x)
+    x = layers.Conv2DTranspose(3, (4, 4), strides=(1, 1), padding='same', activation='tanh', use_bias=False, kernel_initializer=weight_init)(x)
 
     return models.Model([z, y], x, name='generator')
 
@@ -53,7 +53,7 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
     x = layers.concatenate([im, y], axis=3)
 
     if aspect_ratio == ASPECT_16_9:
-        steps = (int(log(image_size[1], 2)) - int(log(4, 2)))
+        steps = (int(log(image_size[1], 2)) - int(log(8, 2)))
     elif aspect_ratio == ASPECT_16_10:
         steps = int(log(image_size[1], 2)) - int(log(8, 2))
     else:
@@ -63,8 +63,8 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
 
     for i in range(steps):
         dim_mul = int(pow(2, i))
-        x = layers.Conv2D(dim * dim_mul, (4, 4), strides=(2, 2), padding='same')(x)
-        x = layers.LayerNormalization()(x)
+        x = layers.Conv2D(dim * dim_mul, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+        # x = layers.LayerNormalization()(x)
         x = layers.LeakyReLU(alpha=lr_slope)(x)
 
     x = layers.Flatten()(x)

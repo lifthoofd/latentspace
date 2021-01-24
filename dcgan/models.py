@@ -53,7 +53,7 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
     x = layers.concatenate([im, y], axis=3)
 
     if aspect_ratio == ASPECT_16_9:
-        steps = (int(log(image_size[1], 2)) - int(log(4, 2)))
+        steps = (int(log(image_size[1], 2)) - int(log(8, 2)))
     elif aspect_ratio == ASPECT_16_10:
         steps = int(log(image_size[1], 2)) - int(log(8, 2))
     else:
@@ -64,7 +64,7 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
     for i in range(steps):
         dim_mul = int(pow(2, i))
         x = layers.Conv2D(dim * dim_mul, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
-        # x = layers.LayerNormalization()(x)
+        x = layers.LayerNormalization()(x)
         x = layers.LeakyReLU(alpha=lr_slope)(x)
 
     x = layers.Flatten()(x)

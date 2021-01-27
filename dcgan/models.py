@@ -38,7 +38,8 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
             x = layers.Conv2DTranspose(dim * dim_mul, (4, 4), strides=(3, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
         else:
             x = layers.Conv2DTranspose(dim * dim_mul, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
-        x = layers.BatchNormalization(momentum=bn_momentum)(x)
+        x = layers.BatchNormalization()(x)
+        # x = layers.BatchNormalization(momentum=bn_momentum)(x)
         x = layers.ReLU()(x)
 
     x = layers.Conv2DTranspose(3, (4, 4), strides=(1, 1), padding='same', activation='tanh', use_bias=False, kernel_initializer=weight_init)(x)
@@ -64,7 +65,7 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
     for i in range(steps):
         dim_mul = int(pow(2, i))
         x = layers.Conv2D(dim * dim_mul, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
-        x = layers.LayerNormalization()(x)
+        # x = layers.LayerNormalization()(x)
         x = layers.LeakyReLU(alpha=lr_slope)(x)
 
     x = layers.Flatten()(x)

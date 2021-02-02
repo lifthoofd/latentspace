@@ -9,7 +9,8 @@ from functools import partial
 import subprocess
 
 from dcgan.dataset import DatasetPipeline
-import dcgan.models as models
+# import dcgan.models as models
+import dcgan.models as test_models
 
 
 SUMMARY_FREQ = 4
@@ -73,9 +74,11 @@ class DCGAN:
         self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         # make generator
-        self.generator = models.make_generator_model(self.num_labels, self.z_dim, self.weight_init, self.bn_momentum, self.image_size, self.aspect, self.filters)
+        self.generator = test_models.make_generator_model(self.num_labels, self.z_dim, self.weight_init, self.bn_momentum, self.image_size, self.aspect, self.filters)
+        # self.generator = models.make_generator_model(self.num_labels, self.z_dim, self.weight_init, self.bn_momentum, self.image_size, self.aspect, self.filters)
         # make discriminator
-        self.discriminator = models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size, self.lr_slope, self.aspect, self.filters)
+        self.discriminator = test_models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size, self.lr_slope, self.aspect, self.filters)
+        # self.discriminator = models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size, self.lr_slope, self.aspect, self.filters)
 
         # print summaries
         self.generator.summary()

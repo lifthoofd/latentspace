@@ -16,52 +16,52 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     x = layers.ReLU()(x)
 
     # 4, 8
-    x = layers.Con2DTranspose(1024,
-                              (4, 4),
-                              strides=(2, 2),
-                              padding='same',
-                              use_bias=False,
-                              kernel_initializer=weight_init)(x)
+    x = layers.Conv2DTranspose(1024,
+                               (4, 4),
+                               strides=(2, 2),
+                               padding='same',
+                               use_bias=False,
+                               kernel_initializer=weight_init)(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 
     # 8, 16
-    x = layers.Con2DTranspose(512,
-                              (4, 4),
-                              strides=(2, 2),
-                              padding='same',
-                              use_bias=False,
-                              kernel_initializer=weight_init)(x)
+    x = layers.Conv2DTranspose(512,
+                               (4, 4),
+                               strides=(2, 2),
+                               padding='same',
+                               use_bias=False,
+                               kernel_initializer=weight_init)(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 
     # 16, 32
-    x = layers.Con2DTranspose(256,
-                              (4, 4),
-                              strides=(2, 2),
-                              padding='same',
-                              use_bias=False,
-                              kernel_initializer=weight_init)(x)
+    x = layers.Conv2DTranspose(256,
+                               (4, 4),
+                               strides=(2, 2),
+                               padding='same',
+                               use_bias=False,
+                               kernel_initializer=weight_init)(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 
     # 32, 64
-    x = layers.Con2DTranspose(128,
-                              (4, 4),
-                              strides=(2, 2),
-                              padding='same',
-                              use_bias=False,
-                              kernel_initializer=weight_init)(x)
+    x = layers.Conv2DTranspose(128,
+                               (4, 4),
+                               strides=(2, 2),
+                               padding='same',
+                               use_bias=False,
+                               kernel_initializer=weight_init)(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 
     # 64, 128
-    x = layers.Con2DTranspose(64,
-                              (4, 4),
-                              strides=(2, 2),
-                              padding='same',
-                              use_bias=False,
-                              kernel_initializer=weight_init)(x)
+    x = layers.Conv2DTranspose(64,
+                               (4, 4),
+                               strides=(2, 2),
+                               padding='same',
+                               use_bias=False,
+                               kernel_initializer=weight_init)(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 

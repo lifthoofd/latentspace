@@ -167,17 +167,21 @@ class DCGAN:
         expanded_labels = one_hot_labels * np.ones([M, img_size[0], img_size[1], num_labels], dtype=np.float32)
         return one_hot_labels, expanded_labels
 
-    def train_step(self, batch):
+    def train_step(self, batch, step):
         imgs, labels = batch
         y_real = self.one_hot(labels, self.num_labels)
         _, y_real_expanded = self.expand_labels(labels, self.num_labels)
 
-        disc_loss = 0
+        # disc_loss = 0
 
-        for _ in range(self.n_critics):
-            disc_loss = self.train_d(imgs, y_real, y_real_expanded)
+        # for _ in range(self.n_critics):
+        #     disc_loss = self.train_d(imgs, y_real, y_real_expanded)
 
-        gen_loss = self.train_g()
+        disc_loss = self.train_d(imgs, y_real, y_real_expanded)
+        if step % self.n_critics == 0:
+            gen_loss = self.train_g()
+        else:
+            gen_loss = None
 
         return gen_loss, disc_loss
 
@@ -233,11 +237,14 @@ class DCGAN:
                 for batch in self.dataset:
                     step = self.checkpoint.step.numpy()
 
-                    gen_loss, disc_loss = self.train_step(batch)
+                    gen_loss, disc_loss = self.train_step(batch, step)
 
-                    self.losses['gen'] = float(gen_loss.numpy())
+                    if gen_loss is not None:
+                        self.losses['gen'] = float(gen_loss.numpy())
+                        gen_loss_mean.update_state(gen_loss)
+
                     self.losses['disc'] = float(disc_loss.numpy())
-                    gen_loss_mean.update_state(gen_loss)
+
                     disc_loss_mean.update_state(disc_loss)
 
                     if step % self.log_freq == 0:
@@ -247,10 +254,12 @@ class DCGAN:
                                                                                                                disc_loss))
                     if step % SUMMARY_FREQ == 0:
                         with self.summary_writer.as_default():
-                            tf.summary.scalar('generator loss', gen_loss_mean.result(), step=step)
+                            if gen_loss is not None:
+                                tf.summary.scalar('generator loss', gen_loss_mean.result(), step=step)
                             tf.summary.scalar('discriminator loss', disc_loss_mean.result(), step=step)
 
-                        gen_loss_mean.reset_states()
+                        if gen_loss is not None:
+                            gen_loss_mean.reset_states()
                         disc_loss_mean.reset_states()
 
                         self.summary_writer.flush()

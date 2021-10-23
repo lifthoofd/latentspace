@@ -43,7 +43,7 @@ def init_img_folder(gan, path, project, session):
         os.mkdir(path)
 
     for i in range(gan.num_labels):
-        z = tf.random.normal([10, 1, 1, gan.z_dim])
+        z = np.random.normal(size=[10, 1, 1, gan.z_dim]).astype('float32')
         labels = [i] * 10
         y = gan.one_hot(labels, gan.num_labels)
 
@@ -53,7 +53,9 @@ def init_img_folder(gan, path, project, session):
             image = image * 127.5 + 127.5
             fn = gen_filename('.png')
             tf.io.write_file(os.path.join(path, fn), tf.image.encode_png(tf.cast(image, tf.uint8)))
-            im = Image(path=os.path.join(path, fn), z=pickle.dumps(z[j]), y=pickle.dumps(y[j]), project=project)
+            new_z = z[j].reshape(-1, 1, 1, gan.z_dim)
+            new_y = y[j].reshape(-1, 1, 1, gan.num_labels)
+            im = Image(path=os.path.join(path, fn), z=pickle.dumps(new_z), y=pickle.dumps(new_y), project=project)
             session.add(im)
             session.commit()
 
@@ -101,8 +103,8 @@ def update_sel_image_browser(session, project, page, data, window, size):
     window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256))
 
     y = pickle.loads(im.y)
-    for i in range(len(y[0][0])):
-        window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][i])
+    for i in range(len(y[0][0][0])):
+        window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][0][i])
 
     return im.id
 
@@ -111,10 +113,6 @@ def update_sel_image_timeline(session, project, page, data, window, size):
     offset = page * (size[0] * size[1])
     im = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (data[0] * size[1])).limit(size[1]).all()[data[1]]
     window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256))
-
-    # y = pickle.loads(im.y)
-    # for i in range(len(y[0][0])):
-    #     window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][i])
 
     return im.id
 
@@ -136,7 +134,6 @@ def create_children(session, gan, im_id, data):
         for i in range(amount):
             z_mod = np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32') * rand
             new_z = z + z_mod
-            print(new_z)
             new_child = Child(z=pickle.dumps(new_z), y=pickle.dumps(y))
             session.add(new_child)
             session.commit()

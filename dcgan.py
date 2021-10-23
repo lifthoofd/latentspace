@@ -1,5 +1,7 @@
 import os
+import sys
 import time
+import json
 from random import randint
 # import gc
 import tensorflow as tf
@@ -7,10 +9,11 @@ import numpy as np
 import datetime
 from functools import partial
 import subprocess
+import argparse
 
-from dcgan.dataset import DatasetPipeline
+from dataset import DatasetPipeline
 # import dcgan.models as models
-import dcgan.test_models as models
+import alt_models as models
 
 
 SUMMARY_FREQ = 4
@@ -19,22 +22,22 @@ SUMMARY_FREQ = 4
 class DCGAN:
     def __init__(self, config):
         self.num_epochs = int(config['num_epochs'])
-        self.batch_size = int(config['batch_size'])
-        self.z_dim = int(config['z_dim'])
+        self.batch_size = 32
+        self.z_dim = 100
         self.learning_rate_gen = float(config['learning_rate_gen'])
         self.learning_rate_disc = float(config['learning_rate_disc'])
-        self.bn_momentum = float(config['batch_norm_momentum'])
-        self.lr_slope = float(config['lrelu_slope'])
-        self.log_freq = int(config['log_freq'])
-        self.checkpoint_freq = int(config['checkpoint_freq'])
-        self.num_images_in_row = int(config['num_images_in_row'])
+        self.bn_momentum = 0.8
+        self.lr_slope = 0.2
+        self.log_freq = 1
+        self.checkpoint_freq = 5
+        self.num_images_in_row = 10
         self.dataset_path = str(config['dataset_path'])
         self.dataset_name = str(config['dataset_name'])
         self.image_size_x = int(config['image_size_x'])
         self.image_size_y = int(config['image_size_y'])
         self.image_size = (self.image_size_y, self.image_size_x)
-        self.aspect = int(config['aspect'])
-        self.filters = int(config['filters'])
+        self.aspect = 0
+        self.filters = 64
         self.ckpt_path = str(config['ckpt_path'])
         self.samples_path = str(config['samples_path'])
         self.images_path = os.path.join(str(config['images_path']), 'train')
@@ -343,3 +346,39 @@ class DCGAN:
         file_name = 'epoch_{:04d}.png'.format(epoch)
         output_dir = os.path.join(self.samples_path, file_name)
         tf.io.write_file(output_dir, tf.image.encode_png(tf.cast(img, tf.uint8)))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Latent Space')
+    parser.add_argument('-n', '--num_epochs', type=int, default=20000, help='The total number of epochs to train')
+    parser.add_argument('-p', '--dataset_path', type=str, help='the path to the dataset')
+    parser.add_argument('-d', '--dataset_name', type=str, help='dataset name, mainly used for backend related processes, is required but can be anything')
+    parser.add_argument('-x', '--image_size_x', type=int, default=256, help='the width of the images in the dataset')
+    parser.add_argument('-y', '--image_size_y', type=int, default=128, help='the height of the images in the dataset')
+    parser.add_argument('-P', '--project_path', type=str, help='the path where you want to store all things related to this latent space project')
+    parser.add_argument('-c', '--n_critics', type=int, default=5, help='the number of critics')
+    parser.add_argument('-g', '--gp_mult', type=int, default=10, help='gradient penalty multiplier')
+    parser.add_argument('-G', '--learning_rate_gen', type=float, default=0.00005, help='learning rate of the generator')
+    parser.add_argument('-D', '--learning_rate_disc', type=float, default=0.0001, help='learning rate of the discriminator')
+
+    args = parser.parse_args()
+
+    if os.path.isfile(os.path.join(args.project_path, 'project_file.json')):
+        with open(os.path.join(args.project_path, 'project_file.json'), 'r') as f:
+            args.__dict__ = json.load(f)
+
+    conf = args.__dict__
+    conf['ckpt_path'] = os.path.join(conf['project_path'], 'ckpts')
+    conf['samples_path'] = os.path.join(conf['project_path'], 'samples')
+    conf['images_path'] = os.path.join(conf['project_path'], 'images')
+    conf['summary_path'] = os.path.join(conf['project_path'], 'summary')
+    print(conf)
+
+    if not os.path.isdir(conf['project_path']):
+        os.mkdir(conf['project_path'])
+        with open(os.path.join(conf['project_path'], 'project_file.json'), 'w') as f:
+            json.dump(args.__dict__, f, indent=2)
+
+    gan = DCGAN(conf)
+    gan.train()
+

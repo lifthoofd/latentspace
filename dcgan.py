@@ -45,7 +45,7 @@ class DCGAN:
         self.n_critics = int(config['n_critics'])
         self.gp_mult = float(config['gp_mult'])
         if not os.path.isdir(self.images_path):
-            os.mkdir(self.images_path)
+            os.makedirs(self.images_path)
         self.is_training = False
         self.losses = {}
         self.progress = {}

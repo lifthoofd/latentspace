@@ -44,8 +44,12 @@ def init_img_folder(gan, path, project, session):
 
     for i in range(gan.num_labels):
         z = np.random.normal(size=[10, 1, 1, gan.z_dim]).astype('float32')
+        #z = tf.random.normal([10, 1, 1, gan.z_dim])
         labels = [i] * 10
         y = gan.one_hot(labels, gan.num_labels)
+        
+        print(z.shape)
+        print(y.shape)
 
         images = gan.generate_image(z, y)
 
@@ -56,6 +60,7 @@ def init_img_folder(gan, path, project, session):
             new_z = z[j].reshape(-1, 1, 1, gan.z_dim)
             new_y = y[j].reshape(-1, 1, 1, gan.num_labels)
             im = Image(path=os.path.join(path, fn), z=pickle.dumps(new_z), y=pickle.dumps(new_y), project=project)
+            #im = Image(path=os.path.join(path, fn), z=pickle.dumps(z[j]), y=pickle.dumps(y[j]), project=project)
             session.add(im)
             session.commit()
 
@@ -107,12 +112,20 @@ def update_sel_image_browser(session, project, page, data, window, size):
         window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][0][i])
 
     return im.id
+    
+    
+def update_sel_image_child(window, im):
+    window['-SEL_IMAGE-'].update(data=im, size=(512, 256))
 
 
 def update_sel_image_timeline(session, project, page, data, window, size):
     offset = page * (size[0] * size[1])
     im = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (data[0] * size[1])).limit(size[1]).all()[data[1]]
     window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256))
+
+    # y = pickle.loads(im.y)
+    # for i in range(len(y[0][0])):
+    #     window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][i])
 
     return im.id
 
@@ -126,6 +139,7 @@ def create_children(session, gan, im_id, data):
     if origin_im is not None:
         z = np.array(pickle.loads(origin_im.z)).astype('float32')
         y = np.array(data[0]).astype('float32')
+        z = z.reshape((1, 1, 1, gan.z_dim))
         y = y.reshape((1, 1, 1, gan.num_labels))
 
         rand = data[1]
@@ -134,6 +148,7 @@ def create_children(session, gan, im_id, data):
         for i in range(amount):
             z_mod = np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32') * rand
             new_z = z + z_mod
+            print(new_z)
             new_child = Child(z=pickle.dumps(new_z), y=pickle.dumps(y))
             session.add(new_child)
             session.commit()
@@ -141,6 +156,8 @@ def create_children(session, gan, im_id, data):
 
 def show_children(session, gan, window):
     children = session.query(Child).order_by(asc(Child.id)).all()
+    
+    base64_strs = []
 
     for y in range(IM_CHILDREN_SIZE[1]):
         for x in range(IM_CHILDREN_SIZE[0]):
@@ -150,7 +167,7 @@ def show_children(session, gan, window):
         child = children[i]
         x = i % IM_CHILDREN_SIZE[0]
         y = i // IM_CHILDREN_SIZE[0]
-
+        
         image = gan.generate_image(z=pickle.loads(child.z), y=pickle.loads(child.y))
         image = image * 127.5 + 127.5
         image = image.astype(np.uint8)
@@ -160,12 +177,15 @@ def show_children(session, gan, window):
             im.save(output_bytes, 'PNG')
             bytes_data = output_bytes.getvalue()
         base64_str = base64.b64encode(bytes_data)
+        base64_strs.append(base64_str)
         window[('-IMAGE_CHILDREN-', (x, y))].update(image_data=base64_str, image_size=(128, 64))
+    return base64_strs
 
 
 def save_image(session, gan, project, data, path):
     index = data[1] * IM_CHILDREN_SIZE[0] + data[0]
     child = session.query(Child).order_by(asc(Child.id)).all()[index]
+    print(pickle.loads(child.z))
     image = gan.generate_image(z=pickle.loads(child.z), y=pickle.loads(child.y))
     image = image * 127.5 + 127.5
     fn = gen_filename('.png')
@@ -215,8 +235,9 @@ def export_timeline(gan, timelines, frames, loop, interp, path):
 
     for im in ims:
         z_keys.append(pickle.loads(im.z))
+        print(pickle.loads(im.z))
         y_keys.append(pickle.loads(im.y))
-
+    
     z_keys = np.asarray(z_keys)
     y_keys = np.asarray(y_keys)
 
@@ -277,7 +298,7 @@ def make_window1(session, project, gan, im_page):
     layout = [[sg.Column(img_sel), sg.Column(img_control, expand_x=True)],
               [sg.Column(img_browser_row), sg.Column(img_children)]]
 
-    return sg.Window('Image Browser', layout, size=(1200, 900), finalize=True)
+    return sg.Window('Image Browser', layout, size=(1200, 1000), finalize=True)
 
 
 def make_window2(session, project, im_page):
@@ -288,7 +309,8 @@ def make_window2(session, project, im_page):
     timeline = []
     for i in range(IM_GALLERY_SIZE_TIMELINE[1]):
         item = sg.Column([[sg.Image(filename=PLACEHOLDER_IM_PATH, size=(128, 64), key=('-TIMELINE_IMAGE-', i))],
-                          [sg.InputText(default_text='0', size=10, key=('-TIMELINE_ORDER-', i), enable_events=True)]])
+                          [sg.InputText(default_text='0', size=10, key=('-TIMELINE_ORDER-', i), enable_events=True)],
+                          [sg.Button('Remove', key=('-REMOVE_FROM_TIMELINE-', i), enable_events=True)]])
         timeline.append(item)
 
     timeline_navigation = [sg.Button('Previous', key='-PREV_TIMELINE-', enable_events=True),
@@ -302,7 +324,7 @@ def make_window2(session, project, im_page):
 
     layout = [[sg.Column(img_sel), sg.Column(timeline_controls)], [timeline], [timeline_navigation], [sg.Column(img_browser_row)]]
 
-    return sg.Window('Timeline', layout, size=(1200, 900), finalize=True)
+    return sg.Window('Timeline', layout, size=(1200, 1000), finalize=True)
 
 
 def main():
@@ -336,6 +358,7 @@ def main():
     timeline_loop = True
     control_data = [[[[0. for _ in range(gan.num_labels)]]], 0.5, 10]
     im_sel_child = None
+    children_ims = []
 
     project = session.query(Project).filter_by(path=conf['project_path']).first()
     if project is None:
@@ -355,7 +378,7 @@ def main():
     sg.theme('DarkAmber')
 
     # # Create the Windows
-    window1, window2 = make_window1(session, project, gan, im_page_browser), make_window2(session, project, im_page_timeline)
+    window2, window1= make_window2(session, project, im_page_timeline), make_window1(session, project, gan, im_page_browser)
 
     update_timeline(window2, timelines, timeline_offset)
 
@@ -377,11 +400,23 @@ def main():
 
             if event[0] == '-IMAGE_CHILDREN-':
                 im_sel_child = event[1]
+                print(im_sel_child)
+                print(im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0])
+                update_sel_image_child(window, children_ims[im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0]])
 
             if event[0] == '-TIMELINE_ORDER-':
                 if values[event] != '':
                     timelines[event[1] + timeline_offset].order = int(values[event])
                     session.commit()
+            
+            if event[0] == '-REMOVE_FROM_TIMELINE-':
+                print('removing: ' + str(event[1] + timeline_offset))
+                removed_item = timelines.pop(event[1] + timeline_offset)
+                print(removed_item)
+                session.delete(removed_item)
+                session.commit()
+                update_timeline(window, timelines, timeline_offset)
+                
         else:
             if event == '-NEXT_PAGE-':
                 if window == window1:
@@ -422,7 +457,7 @@ def main():
 
             if event == '-CREATE_CHILDREN-':
                 create_children(session, gan, im_sel_id_browser, control_data)
-                show_children(session, gan, window)
+                children_ims = show_children(session, gan, window)
 
             if event == '-SAVE_CHILD-':
                 save_image(session, gan, project, im_sel_child, gen_img_path)
@@ -431,6 +466,9 @@ def main():
                 timelines = add_image_to_timeline(session, project, im_sel_id_timeline, im_sel_id_timeline_pos)
                 im_sel_id_timeline_pos += 1
                 update_timeline(window, timelines, timeline_offset)
+                
+            #if event == '-REMOVE_FROM_TIMELINE-':
+            #   print('remove from timeline')
 
             if event == '-PREV_TIMELINE-':
                 if not timeline_offset <= 0:

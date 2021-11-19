@@ -105,6 +105,9 @@ class DCGAN:
             self.checkpoint.restore(self.checkpoint_manager.latest_checkpoint)
             print('restored latest checkpoint {}'.format(self.checkpoint_manager.latest_checkpoint))
 
+    def get_label_strings(self):
+        return self.dataset_pipeline.get_label_strings()
+
     @staticmethod
     def smooth_positive_labels(y):
         return y - 0.3 + (np.random.random(y.shape) * 0.5)

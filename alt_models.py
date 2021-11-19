@@ -9,10 +9,20 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
 
     gen_in = layers.concatenate([z, y], axis=3)
 
-    start_size = (2, 4)
+    start_size = (1, 2)
 
-    x = layers.Dense(start_size[0] * start_size[1] * 2048)(gen_in)
-    x = layers.Reshape((start_size[0], start_size[1], 2048))(x)
+    x = layers.Dense(start_size[0] * start_size[1] * 4096)(gen_in)
+    x = layers.Reshape((start_size[0], start_size[1], 4096))(x)
+    x = layers.ReLU()(x)
+
+    # 2, 4
+    x = layers.Conv2DTranspose(2048,
+                               (3, 3),
+                               strides=(2, 2),
+                               padding='same',
+                               use_bias=False,
+                               kernel_initializer=weight_init)(x)
+    x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 
     # 4, 8
@@ -66,7 +76,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     x = layers.ReLU()(x)
 
     # 128, 256
-    x = layers.Conv2DTranspose(64,
+    x = layers.Conv2DTranspose(32,
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
@@ -87,7 +97,7 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
     x = layers.concatenate([im, y], axis=3)
 
     # 64, 128
-    x = layers.Conv2D(64, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = layers.Conv2D(32, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 
@@ -115,9 +125,15 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
     x = layers.Conv2D(1024, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
+    
+    # 1, 2
+    x = layers.Conv2D(2048, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    # x = layers.LayerNormalization()(x)
+    x = layers.LeakyReLU()(x)
 
     x = layers.Flatten()(x)
     x = layers.Dense(1)(x)
 
     return models.Model([im, y], x, name='discriminator')
+
 

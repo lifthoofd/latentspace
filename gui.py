@@ -315,8 +315,8 @@ def make_window2(session, project, im_page):
         timeline.append(item)
 
     timeline_navigation = [sg.Button('Previous', key='-PREV_TIMELINE-', enable_events=True),
-                           sg.Button('Update Order', key='-UPDATE_ORDER-', enable_events=True),
-                           sg.Button('Next', key='-NEXT_TIMELINE-', enable_events=True)]
+                         sg.Button('Update Order', key='-UPDATE_ORDER-', enable_events=True),
+                         sg.Button('Next', key='-NEXT_TIMELINE-', enable_events=True)]
 
     timeline_controls = [[sg.Text('Interpolation:'), sg.Combo(['linear', 'sine'], default_value='linear', key='-TIMELINE_INTERP-', enable_events=True)],
                          [sg.Text('Frames:'), sg.InputText(default_text='1000', key='-TIME_LINE_FRAMES-', enable_events=True)],

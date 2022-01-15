@@ -22,7 +22,7 @@ SUMMARY_FREQ = 4
 class DCGAN:
     def __init__(self, config):
         self.num_epochs = int(config['num_epochs'])
-        self.batch_size = 32
+        self.batch_size = 64
         self.z_dim = 100
         self.learning_rate_gen = float(config['learning_rate_gen'])
         self.learning_rate_disc = float(config['learning_rate_disc'])
@@ -353,11 +353,11 @@ class DCGAN:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Latent Space')
-    parser.add_argument('-n', '--num_epochs', type=int, default=20000, help='The total number of epochs to train')
+    parser.add_argument('-n', '--num_epochs', type=int, default=10000000, help='The total number of epochs to train')
     parser.add_argument('-p', '--dataset_path', type=str, help='the path to the dataset')
     parser.add_argument('-d', '--dataset_name', type=str, help='dataset name, mainly used for backend related processes, is required but can be anything')
-    parser.add_argument('-x', '--image_size_x', type=int, default=256, help='the width of the images in the dataset')
-    parser.add_argument('-y', '--image_size_y', type=int, default=128, help='the height of the images in the dataset')
+    parser.add_argument('-x', '--image_size_x', type=int, default=512, help='the width of the images in the dataset')
+    parser.add_argument('-y', '--image_size_y', type=int, default=256, help='the height of the images in the dataset')
     parser.add_argument('-P', '--project_path', type=str, help='the path where you want to store all things related to this latent space project')
     parser.add_argument('-c', '--n_critics', type=int, default=5, help='the number of critics')
     parser.add_argument('-g', '--gp_mult', type=int, default=10, help='gradient penalty multiplier')

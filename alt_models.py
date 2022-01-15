@@ -16,7 +16,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     x = layers.ReLU()(x)
 
     # 2, 4
-    x = layers.Conv2DTranspose(2048,
+    x = layers.Conv2DTranspose(4096,
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
@@ -26,7 +26,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     x = layers.ReLU()(x)
 
     # 4, 8
-    x = layers.Conv2DTranspose(1024,
+    x = layers.Conv2DTranspose(2048,
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
@@ -36,7 +36,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     x = layers.ReLU()(x)
 
     # 8, 16
-    x = layers.Conv2DTranspose(512,
+    x = layers.Conv2DTranspose(1024,
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
@@ -46,7 +46,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     x = layers.ReLU()(x)
 
     # 16, 32
-    x = layers.Conv2DTranspose(256,
+    x = layers.Conv2DTranspose(512,
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
@@ -56,7 +56,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     x = layers.ReLU()(x)
 
     # 32, 64
-    x = layers.Conv2DTranspose(128,
+    x = layers.Conv2DTranspose(256,
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
@@ -66,7 +66,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     x = layers.ReLU()(x)
 
     # 64, 128
-    x = layers.Conv2DTranspose(64,
+    x = layers.Conv2DTranspose(128,
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
@@ -76,6 +76,16 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     x = layers.ReLU()(x)
 
     # 128, 256
+    x = layers.Conv2DTranspose(64,
+                               (3, 3),
+                               strides=(2, 2),
+                               padding='same',
+                               use_bias=False,
+                               kernel_initializer=weight_init)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.ReLU()(x)
+
+    # 256, 512
     x = layers.Conv2DTranspose(32,
                                (3, 3),
                                strides=(2, 2),
@@ -96,38 +106,43 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
 
     x = layers.concatenate([im, y], axis=3)
 
-    # 64, 128
+    # 128, 256
     x = layers.Conv2D(32, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 
-    # 32, 64
+    # 64, 128
     x = layers.Conv2D(64, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 
-    # 16, 32
+    # 32, 64
     x = layers.Conv2D(128, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 
-    # 8, 16
+    # 16, 32
     x = layers.Conv2D(256, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 
-    # 4, 8
+    # 8, 16
     x = layers.Conv2D(512, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 
-    # 2, 4
+    # 4, 8
     x = layers.Conv2D(1024, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    # x = layers.LayerNormalization()(x)
+    x = layers.LeakyReLU()(x)
+
+    # 2, 4
+    x = layers.Conv2D(2048, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
     
     # 1, 2
-    x = layers.Conv2D(2048, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = layers.Conv2D(4096, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 

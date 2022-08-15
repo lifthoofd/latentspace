@@ -74,15 +74,14 @@ class DCGAN:
         np.savetxt(os.path.join(config['project_path'], 'labels.txt'), label_strings, fmt='%s')
 
         # make weight init
-        # self.weight_init_g = tf.keras.initializers.TruncatedNormal(stddev=0.02, mean=0.0)
-        # self.weight_init_d = tf.keras.initializers.TruncatedNormal(stddev=0.02, mean=0.0)
+        self.weight_init = tf.keras.initializers.TruncatedNormal(stddev=0.02, mean=0.0)
         # make cross entropy function
-        # self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         # make generator
-        self.generator = models.make_generator_model(self.num_labels, self.z_dim, None, self.bn_momentum, self.image_size, self.aspect, self.filters)
+        self.generator = models.make_generator_model(self.num_labels, self.z_dim, self.weight_init, self.bn_momentum, self.image_size, self.aspect, self.filters)
         # make discriminator
-        self.discriminator = models.make_discriminator_model(self.num_labels, None, self.image_size, self.lr_slope, self.aspect, self.filters)
+        self.discriminator = models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size, self.lr_slope, self.aspect, self.filters)
 
         # print summaries
         self.generator.summary()

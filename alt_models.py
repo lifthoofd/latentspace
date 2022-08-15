@@ -80,6 +80,15 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     x = layers.LeakyReLU()(x)
 
     # 256, 128
+    x = layers.Conv2DTranspose(8,
+                               (5, 5),
+                               strides=(2, 2),
+                               padding='same',
+                               use_bias=False)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.LeakyReLU()(x)
+
+    # 512, 256
     x = layers.Conv2DTranspose(3, (5, 5), strides=(2, 2), padding='same', activation='tanh', use_bias=False)(x)
 
     return models.Model([z, y], x, name='generator')
@@ -90,6 +99,11 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
     y = layers.Input(shape=(image_size[0], image_size[1], y_dim))
 
     x = layers.concatenate([im, y], axis=3)
+
+    # 256, 128
+    x = layers.Conv2D(8, (5, 5), strides=(2, 2), padding='same', use_bias=False)(x)
+    x = layers.LeakyReLU(alpha=0.2)(x)
+    # x = layers.Dropout(0.3)(x)
 
     # 128, 64
     x = layers.Conv2D(16, (5, 5), strides=(2, 2), padding='same', use_bias=False)(x)

@@ -9,7 +9,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
 
     gen_in = layers.concatenate([z, y], axis=3)
 
-    start_size = (2, 1)
+    start_size = (1, 2)
 
     x = layers.Dense(start_size[0] * start_size[1] * 2048)(gen_in)
     x = layers.BatchNormalization()(x)

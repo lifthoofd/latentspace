@@ -70,6 +70,8 @@ class DCGAN:
                                                 self.batch_size)
         self.dataset = self.dataset_pipeline.load_dataset()
         self.num_labels = self.dataset_pipeline.get_num_labels()
+        label_strings = self.dataset_pipeline.get_label_strings()
+        np.savetxt(os.path.join(config['project_path'], 'labels.txt'), label_strings, fmt='%s')
 
         # make weight init
         self.weight_init = tf.keras.initializers.TruncatedNormal(stddev=0.02, mean=0.0)
@@ -282,6 +284,7 @@ class DCGAN:
 
                 if (epoch + 1) % self.checkpoint_freq == 0:
                     ckpt_save_path = self.checkpoint_manager.save()
+                    self.generator.save(os.path.join(conf['project_path'], 'generator.h5'))
 
                 self.checkpoint.epoch.assign(epoch)
 
@@ -375,6 +378,7 @@ if __name__ == '__main__':
     conf['samples_path'] = os.path.join(conf['project_path'], 'samples')
     conf['images_path'] = os.path.join(conf['project_path'], 'images')
     conf['summary_path'] = os.path.join(conf['project_path'], 'summary')
+    # conf['model_path'] = os.path.join(conf['project_path'], 'model')
     print(conf)
 
     if not os.path.isdir(conf['project_path']):

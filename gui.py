@@ -17,7 +17,6 @@ from datetime import datetime
 from scipy import interpolate
 
 from db_declare import Base, Project, Image, Timeline, Child
-import dcgan
 
 IM_GALLERY_SIZE_BROWSER = (5, 4)
 IM_GALLERY_SIZE_TIMELINE = (5, 8)
@@ -31,16 +30,45 @@ TIMELINE_INTERP_LINEAR = 'linear'
 TIMELINE_INTERP_SINE = 'sine'
 
 
+class GAN:
+    def __init__(self, project_path):
+        model_path = os.path.join(project_path, 'generator.h5')
+        label_path = os.path.join(project_path, 'labels.txt')
+        self.generator = tf.keras.models.load_model(model_path, compile=False)
+        print(self.generator.summary())
+        self.labels = np.loadtxt(label_path, dtype=str)
+        self.num_labels = self.labels.shape[0]
+        self.z_dim = 100
+
+    @staticmethod
+    def one_hot(labels, num_labels):
+        one_hot_labels = np.eye(num_labels, dtype=np.float32)[labels]
+        one_hot_labels = np.reshape(one_hot_labels, [-1, 1, 1, num_labels])
+        return one_hot_labels
+
+    @tf.function
+    def generate_samples(self, model, z, y):
+        return model([z, y], training=False)
+
+    def generate_image(self, z, y):
+        image = self.generate_samples(self.generator, z, y)
+        image = np.array(image)
+        return image
+
+    def get_label_strings(self):
+        return self.labels
+
+
 def gen_filename(ext):
     return datetime.now().strftime('%Y%d%m-%H%M%S%f') + ext
 
 
 def init_img_folder(gan, path, project, session):
     if not os.path.isdir(path):
-        os.mkdir(path)
+        os.makedirs(path)
     else:
         shutil.rmtree(path)
-        os.mkdir(path)
+        os.makedirs(path)
 
     for i in range(gan.num_labels):
         z = np.random.normal(size=[10, 1, 1, gan.z_dim]).astype('float32')
@@ -259,10 +287,10 @@ def export_timeline(gan, timelines, frames, loop, interp, path):
     gen_ims = np.asarray(gen_ims)
 
     if not os.path.isdir(path):
-        os.mkdir(path)
+        os.makedirs(path)
     else:
         shutil.rmtree(path)
-        os.mkdir(path)
+        os.makedirs(path)
 
     for i, im in enumerate(gen_ims):
         file_path = os.path.join(path, f'{i:09d}.png')
@@ -330,19 +358,19 @@ def make_window2(session, project, im_page):
 
 def main():
     parser = argparse.ArgumentParser(description='Latent Space GUI')
-    parser.add_argument('-p', '--project_file', type=str, help='the path to the project file')
+    parser.add_argument('-p', '--project_path', type=str, help='the path to the project folder, doesnt have to exist yet')
 
     args = parser.parse_args()
-    if not os.path.isfile(args.project_file):
-        print('Not a valid project path!')
+
+    project_path = os.path.abspath(os.path.join(os.getcwd(), args.project_path))
+    print(project_path)
+    if not os.path.isdir(project_path):
+        print('you entered the wrong directory')
         sys.exit()
 
-    with open(args.project_file) as f:
-        conf = json.load(f)
-
-    gan = dcgan.DCGAN(conf)
-    gen_img_path = os.path.join(conf['images_path'], 'generated')
-    timeline_img_path = os.path.join(conf['images_path'], 'timeline')
+    gan = GAN(project_path)
+    gen_img_path = os.path.join(project_path, 'images', 'generated')
+    timeline_img_path = os.path.join(project_path, 'images', 'timeline')
 
     engine = create_engine(f'sqlite:///{DATABASE_PATH}')
     Base.metadata.bind = engine
@@ -361,9 +389,9 @@ def main():
     im_sel_child = None
     children_ims = []
 
-    project = session.query(Project).filter_by(path=conf['project_path']).first()
+    project = session.query(Project).filter_by(path=project_path).first()
     if project is None:
-        project = Project(path=conf['project_path'])
+        project = Project(path=project_path)
         session.add(project)
         session.commit()
 
@@ -409,7 +437,7 @@ def main():
                 if values[event] != '':
                     timelines[event[1] + timeline_offset].order = int(values[event])
                     session.commit()
-            
+
             if event[0] == '-REMOVE_FROM_TIMELINE-':
                 print('removing: ' + str(event[1] + timeline_offset))
                 removed_item = timelines.pop(event[1] + timeline_offset)
@@ -417,7 +445,7 @@ def main():
                 session.delete(removed_item)
                 session.commit()
                 update_timeline(window, timelines, timeline_offset)
-                
+
         else:
             if event == '-NEXT_PAGE-':
                 if window == window1:
@@ -467,7 +495,7 @@ def main():
                 timelines = add_image_to_timeline(session, project, im_sel_id_timeline, im_sel_id_timeline_pos)
                 im_sel_id_timeline_pos += 1
                 update_timeline(window, timelines, timeline_offset)
-                
+
             #if event == '-REMOVE_FROM_TIMELINE-':
             #   print('remove from timeline')
 

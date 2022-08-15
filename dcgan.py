@@ -70,16 +70,19 @@ class DCGAN:
                                                 self.batch_size)
         self.dataset = self.dataset_pipeline.load_dataset()
         self.num_labels = self.dataset_pipeline.get_num_labels()
+        label_strings = self.dataset_pipeline.get_label_strings()
+        np.savetxt(os.path.join(config['project_path'], 'labels.txt'), label_strings, fmt='%s')
 
         # make weight init
-        self.weight_init = tf.keras.initializers.TruncatedNormal(stddev=0.02, mean=0.0)
+        # self.weight_init_g = tf.keras.initializers.TruncatedNormal(stddev=0.02, mean=0.0)
+        # self.weight_init_d = tf.keras.initializers.TruncatedNormal(stddev=0.02, mean=0.0)
         # make cross entropy function
-        self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        # self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         # make generator
-        self.generator = models.make_generator_model(self.num_labels, self.z_dim, self.weight_init, self.bn_momentum, self.image_size, self.aspect, self.filters)
+        self.generator = models.make_generator_model(self.num_labels, self.z_dim, None, self.bn_momentum, self.image_size, self.aspect, self.filters)
         # make discriminator
-        self.discriminator = models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size, self.lr_slope, self.aspect, self.filters)
+        self.discriminator = models.make_discriminator_model(self.num_labels, None, self.image_size, self.lr_slope, self.aspect, self.filters)
 
         # print summaries
         self.generator.summary()
@@ -282,6 +285,7 @@ class DCGAN:
 
                 if (epoch + 1) % self.checkpoint_freq == 0:
                     ckpt_save_path = self.checkpoint_manager.save()
+                    self.generator.save(os.path.join(conf['project_path'], 'generator.h5'))
 
                 self.checkpoint.epoch.assign(epoch)
 
@@ -375,6 +379,7 @@ if __name__ == '__main__':
     conf['samples_path'] = os.path.join(conf['project_path'], 'samples')
     conf['images_path'] = os.path.join(conf['project_path'], 'images')
     conf['summary_path'] = os.path.join(conf['project_path'], 'summary')
+    # conf['model_path'] = os.path.join(conf['project_path'], 'model')
     print(conf)
 
     if not os.path.isdir(conf['project_path']):

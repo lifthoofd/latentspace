@@ -20,8 +20,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
-                               use_bias=False,
-                               kernel_initializer=weight_init)(x)
+                               use_bias=False)(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 
@@ -30,8 +29,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
-                               use_bias=False,
-                               kernel_initializer=weight_init)(x)
+                               use_bias=False)(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 
@@ -40,8 +38,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
-                               use_bias=False,
-                               kernel_initializer=weight_init)(x)
+                               use_bias=False)(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 
@@ -50,8 +47,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
-                               use_bias=False,
-                               kernel_initializer=weight_init)(x)
+                               use_bias=False)(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 
@@ -60,8 +56,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
-                               use_bias=False,
-                               kernel_initializer=weight_init)(x)
+                               use_bias=False)(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 
@@ -70,8 +65,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
                                (3, 3),
                                strides=(2, 2),
                                padding='same',
-                               use_bias=False,
-                               kernel_initializer=weight_init)(x)
+                               use_bias=False)(x)
     x = layers.BatchNormalization()(x)
     x = layers.ReLU()(x)
 
@@ -95,7 +89,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     # x = layers.BatchNormalization()(x)
     # x = layers.ReLU()(x)
 
-    x = layers.Conv2DTranspose(3, (3, 3), strides=(1, 1), padding='same', activation='tanh', use_bias=False, kernel_initializer=weight_init)(x)
+    x = layers.Conv2DTranspose(3, (3, 3), strides=(1, 1), padding='same', activation='tanh', use_bias=False)(x)
 
     return models.Model([z, y], x, name='generator')
 
@@ -117,32 +111,32 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
     # x = layers.LeakyReLU()(x)
 
     # 32, 64
-    x = layers.Conv2D(16, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = layers.Conv2D(16, (3, 3), strides=(2, 2), padding='same', use_bias=False)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 
     # 16, 32
-    x = layers.Conv2D(32, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = layers.Conv2D(32, (3, 3), strides=(2, 2), padding='same', use_bias=False)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 
     # 8, 16
-    x = layers.Conv2D(64, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = layers.Conv2D(64, (3, 3), strides=(2, 2), padding='same', use_bias=False)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 
     # 4, 8
-    x = layers.Conv2D(128, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = layers.Conv2D(128, (3, 3), strides=(2, 2), padding='same', use_bias=False)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 
     # 2, 4
-    x = layers.Conv2D(256, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = layers.Conv2D(256, (3, 3), strides=(2, 2), padding='same', use_bias=False)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
     
     # 1, 2
-    x = layers.Conv2D(512, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = layers.Conv2D(512, (3, 3), strides=(2, 2), padding='same', use_bias=False)(x)
     # x = layers.LayerNormalization()(x)
     x = layers.LeakyReLU()(x)
 

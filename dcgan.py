@@ -22,10 +22,12 @@ SUMMARY_FREQ = 4
 class DCGAN:
     def __init__(self, config):
         self.num_epochs = int(config['num_epochs'])
-        self.batch_size = 64
+        self.batch_size = 128
         self.z_dim = 100
         self.learning_rate_gen = float(config['learning_rate_gen'])
         self.learning_rate_disc = float(config['learning_rate_disc'])
+        self.learning_rate_decay = 1.00004
+        self.min_learning_rate = 0.000001
         self.bn_momentum = 0.8
         self.lr_slope = 0.2
         self.log_freq = 1
@@ -172,22 +174,33 @@ class DCGAN:
         img_size = self.image_size
         expanded_labels = one_hot_labels * np.ones([M, img_size[0], img_size[1], num_labels], dtype=np.float32)
         return one_hot_labels, expanded_labels
+        
+    def set_learning_rate(self):
+        new_lr_gen = max(self.learning_rate_gen / self.learning_rate_decay, self.min_learning_rate)
+        new_lr_disc = max(self.learning_rate_disc / self.learning_rate_decay, self.min_learning_rate)
+        
+        tf.keras.backend.set_value(self.generator_optimizer.lr, new_lr_gen)
+        tf.keras.backend.set_value(self.discriminator_optimizer.lr, new_lr_disc)
+        
+        return new_lr_gen, new_lr_disc
 
     def train_step(self, batch, step):
         imgs, labels = batch
         y_real = self.one_hot(labels, self.num_labels)
         _, y_real_expanded = self.expand_labels(labels, self.num_labels)
 
-        # disc_loss = 0
+        disc_loss = 0
 
-        # for _ in range(self.n_critics):
-        #     disc_loss = self.train_d(imgs, y_real, y_real_expanded)
+        for _ in range(self.n_critics):
+            disc_loss = self.train_d(imgs, y_real, y_real_expanded)
+        
+        gen_loss = self.train_g()
 
-        disc_loss = self.train_d(imgs, y_real, y_real_expanded)
-        if step % self.n_critics == 0:
-            gen_loss = self.train_g()
-        else:
-            gen_loss = None
+        # disc_loss = self.train_d(imgs, y_real, y_real_expanded)
+        # if step % self.n_critics == 0:
+        #     gen_loss = self.train_g()
+        # else:
+        #     gen_loss = None
 
         return gen_loss, disc_loss
 
@@ -211,18 +224,37 @@ class DCGAN:
     @tf.function
     def train_d(self, x_real, y_real, y_real_expanded):
         z = tf.random.normal((self.batch_size, 1, 1, self.z_dim))
+        epsilon = tf.random.uniform(shape=[self.batch_size, 1, 1, 1], minval=0, maxval=1)
 
         with tf.GradientTape() as disc_tape:
-            x_fake = self.generator([z, y_real], training=True)
-            fake_logits = self.discriminator([x_fake, y_real_expanded], training=True)
+            with tf.GradientTape() as gp_tape:
+                x_fake = self.generator([z, y_real], training=True)
+                x_fake_mixed = epsilon * tf.dtypes.cast(x_real, tf.float32) + ((1 - epsilon) * x_fake)
+                fake_mixed_pred = self.discriminator([x_fake_mixed, y_real_expanded], training=True)
+            
+            grads = gp_tape.gradient(fake_mixed_pred, x_fake_mixed)
+            grad_norms = tf.sqrt(tf.reduce_sum(tf.square(grads), axis=[1,2,3]))
+            gradient_penalty = tf.reduce_mean(tf.square(grad_norms - 1))
+            
+            fake_pred = self.discriminator([x_fake, y_real_expanded], training=True)
+            real_pred = self.discriminator([x_real, y_real_expanded], training=True)
+            
+            cost = tf.reduce_mean(fake_pred) - tf.reduce_mean(real_pred) + self.gp_mult * gradient_penalty
+        
+        disc_gradients = disc_tape.gradient(cost, self.discriminator.trainable_variables)
+        self.discriminator_optimizer.apply_gradients(zip(disc_gradients, self.discriminator.trainable_variables))
+        
+        # with tf.GradientTape() as disc_tape:
+        #     x_fake = self.generator([z, y_real], training=True)
+        #     fake_logits = self.discriminator([x_fake, y_real_expanded], training=True)
 
-            real_logits = self.discriminator([x_real, y_real_expanded], training=True)
-            cost = self.discriminator_loss(real_logits, fake_logits)
-            gp = self.gradient_penalty(partial(self.discriminator, training=True), x_real, x_fake, y_real_expanded)
-            cost += self.gp_mult * gp
+        #     real_logits = self.discriminator([x_real, y_real_expanded], training=True)
+        #     cost = self.discriminator_loss(real_logits, fake_logits)
+        #     gp = self.gradient_penalty(partial(self.discriminator, training=True), x_real, x_fake, y_real_expanded)
+        #     cost += self.gp_mult * gp
 
-        grad = disc_tape.gradient(cost, self.discriminator.trainable_variables)
-        self.discriminator_optimizer.apply_gradients(zip(grad, self.discriminator.trainable_variables))
+        # grad = disc_tape.gradient(cost, self.discriminator.trainable_variables)
+        # self.discriminator_optimizer.apply_gradients(zip(grad, self.discriminator.trainable_variables))
         return cost
 
     def train(self):
@@ -231,6 +263,7 @@ class DCGAN:
         self.is_training = True
         gen_loss_mean = tf.keras.metrics.Mean(name='generator loss')
         disc_loss_mean = tf.keras.metrics.Mean(name='discriminator loss')
+        
 
         # start tensorboard
         tensorboard = subprocess.Popen(['tensorboard', '--logdir', self.summary_path, '--bind_all'])
@@ -239,6 +272,8 @@ class DCGAN:
             # print(self.is_training)
             if self.is_training:
                 start = time.time()
+                self.learning_rate_gen, self.learning_rate_disc = self.set_learning_rate()
+                print('generator learning rate: {} | discriminator learning rate: {}'.format(self.learning_rate_gen, self.learning_rate_disc))
 
                 for batch in self.dataset:
                     step = self.checkpoint.step.numpy()
@@ -361,7 +396,7 @@ if __name__ == '__main__':
     parser.add_argument('-P', '--project_path', type=str, help='the path where you want to store all things related to this latent space project')
     parser.add_argument('-c', '--n_critics', type=int, default=5, help='the number of critics')
     parser.add_argument('-g', '--gp_mult', type=int, default=10, help='gradient penalty multiplier')
-    parser.add_argument('-G', '--learning_rate_gen', type=float, default=0.00005, help='learning rate of the generator')
+    parser.add_argument('-G', '--learning_rate_gen', type=float, default=0.0001, help='learning rate of the generator')
     parser.add_argument('-D', '--learning_rate_disc', type=float, default=0.0001, help='learning rate of the discriminator')
 
     args = parser.parse_args()

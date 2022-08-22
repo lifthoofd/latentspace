@@ -15,6 +15,7 @@ from io import BytesIO
 import skimage
 from datetime import datetime
 from scipy import interpolate
+import threading
 
 from db_declare import Base, Project, Image, Timeline, Child
 
@@ -280,6 +281,7 @@ def export_timeline(gan, timelines, frames, loop, interp, path):
 
     gen_ims = []
     for i in range(z_seq.shape[0]):
+        print(f'generating frame {i}')
         z = z_seq[i].reshape(-1, 1, 1, gan.z_dim)
         y = y_seq[i].reshape(-1, 1, 1, gan.num_labels)
         gen_im = gan.generate_image(z, y)
@@ -297,6 +299,7 @@ def export_timeline(gan, timelines, frames, loop, interp, path):
 
     for i, im in enumerate(gen_ims):
         file_path = os.path.join(path, f'{i:09d}.png')
+        print(f'saving file: {file_path}')
         tf.io.write_file(file_path, tf.image.encode_png(tf.cast(im[0], tf.uint8)))
 
 
@@ -357,7 +360,7 @@ def make_window2(session, project, im_page, size):
     timeline_controls = [[sg.Text('Interpolation:'), sg.Combo(['linear', 'sine'], default_value='linear', key='-TIMELINE_INTERP-', enable_events=True)],
                          [sg.Text('Frames:'), sg.InputText(default_text='1000', key='-TIME_LINE_FRAMES-', enable_events=True)],
                          [sg.Text('Loop:'), sg.Checkbox('', default=True, key='-TIMELINE_LOOP-', enable_events=True)],
-                         [sg.Text('Folder: '), sg.Text(size=(50, 1), enable_events=True, key='-TIMELINE_EXPORT_PATH-'), sg.FolderBrowse()],
+                         [sg.Text('Folder: '), sg.In(size=(50, 1), enable_events=True, key='-TIMELINE_EXPORT_PATH-'), sg.FolderBrowse()],
                          [sg.Button('Export', key='-TIMELINE_EXPORT-', enable_events=True)]]
 
     layout = [[sg.Column(img_sel), sg.Column(timeline_controls)], [timeline], [timeline_navigation], [sg.Column(img_browser_row)]]
@@ -548,10 +551,14 @@ def main():
 
             if event == '-TIMELINE_EXPORT_PATH-':
                 export_path = values['-TIMELINE_EXPORT_PATH-']
+                # print(values['-TIMELINE_EXPORT_PATH-'])
 
             if event == '-TIMELINE_EXPORT-':
+                # print(export_path)
                 if export_path != "":
-                    export_timeline(gan, timelines, timeline_frames, timeline_loop, timeline_interp, export_path)
+                    worker = threading.Thread(target=export_timeline, args=(gan, timelines, timeline_frames, timeline_loop, timeline_interp, export_path))
+                    worker.start()
+                    # export_timeline(gan, timelines, timeline_frames, timeline_loop, timeline_interp, export_path)
 
 
 if __name__ == '__main__':

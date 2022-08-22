@@ -18,6 +18,9 @@ from scipy import interpolate
 
 from db_declare import Base, Project, Image, Timeline, Child
 
+WINDOW_BIG = {'size': (2500, 1300), 'sample': 2}
+WINDOW_SMALL = {'size': (1200, 1000), 'sample': 4}
+
 IM_GALLERY_SIZE_BROWSER = (5, 4)
 IM_GALLERY_SIZE_TIMELINE = (5, 8)
 IM_CHILDREN_SIZE = (5, 4)
@@ -93,13 +96,13 @@ def init_img_folder(gan, path, project, session):
             session.commit()
 
 
-def get_image_page(session, project, page, size):
+def get_image_page(session, project, page, size, conf):
     offset = page * (size[0] * size[1])
     rows = [[sg.Text('Images:')]]
 
     for i in range(size[0]):
         ims = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (i * size[1])).limit(size[1]).all()
-        row = [sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=2) for j, im in enumerate(ims)]
+        row = [sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample']) for j, im in enumerate(ims)]
         rows.append(row)
 
     cntrl_row = [sg.Button('Previous Page', key='-PREV_PAGE-', enable_events=True),
@@ -109,19 +112,19 @@ def get_image_page(session, project, page, size):
     return rows
 
 
-def update_image_page(session, project, page, window, size):
+def update_image_page(session, project, page, window, size, conf):
     ims_added = 0
     offset = page * (size[0] * size[1])
 
     for y in range(size[0]):
         for x in range(size[1]):
-            window[('-IMAGE-', (y, x))].update(image_filename=PLACEHOLDER_IM_PATH, image_size=(128, 64), image_subsample=2)
+            window[('-IMAGE-', (y, x))].update(image_filename=PLACEHOLDER_IM_PATH, image_size=(128, 64), image_subsample=conf['sample'])
 
     for i in range(size[0]):
         ims = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (i * size[1])).limit(size[1]).all()
         ims_added += len(ims)
         for j, im in enumerate(ims):
-            window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=2)
+            window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample'])
 
     if ims_added > 0:
         window['-CURR_PAGE_TEXT-'].update(f'Current Page: {page + 1}')
@@ -182,14 +185,14 @@ def create_children(session, gan, im_id, data):
             session.commit()
 
 
-def show_children(session, gan, window):
+def show_children(session, gan, window, conf):
     children = session.query(Child).order_by(asc(Child.id)).all()
     
     base64_strs = []
 
     for y in range(IM_CHILDREN_SIZE[1]):
         for x in range(IM_CHILDREN_SIZE[0]):
-            window[('-IMAGE_CHILDREN-', (x, y))].update(image_filename=PLACEHOLDER_IM_PATH, image_size=(128, 64), image_subsample=2)
+            window[('-IMAGE_CHILDREN-', (x, y))].update(image_filename=PLACEHOLDER_IM_PATH, image_size=(128, 64), image_subsample=conf['sample'])
 
     for i in range(len(children)):
         child = children[i]
@@ -206,7 +209,7 @@ def show_children(session, gan, window):
             bytes_data = output_bytes.getvalue()
         base64_str = base64.b64encode(bytes_data)
         base64_strs.append(base64_str)
-        window[('-IMAGE_CHILDREN-', (x, y))].update(image_data=base64_str, image_size=(128, 64), image_subsample=2)
+        window[('-IMAGE_CHILDREN-', (x, y))].update(image_data=base64_str, image_size=(128, 64), image_subsample=conf['sample'])
     return base64_strs
 
 
@@ -231,14 +234,14 @@ def add_image_to_timeline(session, project, im_id, im_pos):
     return session.query(Timeline).filter_by(project=project).order_by(asc(Timeline.order)).all()
 
 
-def update_timeline(window, timelines, offset):
+def update_timeline(window, timelines, offset, conf):
     tls = timelines[offset: offset + IM_GALLERY_SIZE_TIMELINE[1]]
     for i in range(IM_GALLERY_SIZE_TIMELINE[1]):
-        window[('-TIMELINE_IMAGE-', i)].update(filename=PLACEHOLDER_IM_PATH, size=(128, 64), subsample=2)
+        window[('-TIMELINE_IMAGE-', i)].update(filename=PLACEHOLDER_IM_PATH, size=(128, 64), subsample=conf['sample'])
         window[('-TIMELINE_ORDER-', i)].update(value='0')
 
     for i in range(len(tls)):
-        window[('-TIMELINE_IMAGE-', i)].update(filename=tls[i].image.path, size=(128, 64), subsample=2)
+        window[('-TIMELINE_IMAGE-', i)].update(filename=tls[i].image.path, size=(128, 64), subsample=conf['sample'])
         window[('-TIMELINE_ORDER-', i)].update(value=str(tls[i].order))
 
 
@@ -297,15 +300,19 @@ def export_timeline(gan, timelines, frames, loop, interp, path):
         tf.io.write_file(file_path, tf.image.encode_png(tf.cast(im[0], tf.uint8)))
 
 
-def make_window1(session, project, gan, im_page):
-    img_browser_row = get_image_page(session, project, im_page, IM_GALLERY_SIZE_BROWSER)
+def make_window1(session, project, gan, im_page, size):
+    img_browser_row = get_image_page(session, project, im_page, IM_GALLERY_SIZE_BROWSER, size)
     img_control = []
     label_strings = gan.get_label_strings()
     for i in range(gan.num_labels):
-        cntrl = [sg.Text(label_strings[i]), sg.Slider(range=(0.0, 1.0), resolution=0.0001,
+        cntrl = [sg.Text(label_strings[i]), sg.Slider(range=(-1.0, 1.0), resolution=0.0001,
                                                       orientation='horizontal', expand_x=True,
-                                                      key=f'-CONTROL_LABEL_{i}-', enable_events=True)]
+                                                      key=f'-CONTROL_LABEL_{i}-', default_value=0.0,
+                                                      enable_events=True)]
         img_control.append(cntrl)
+
+    img_control.append([sg.Button('Reset', key='-RESET_LABEL-')])
+    img_control.append([sg.HorizontalSeparator(pad=((0, 0), (20, 20)))])
 
     img_control.append([sg.Text('random:'), sg.Slider(range=(0.0, 1.0), resolution=0.0001,
                                                       orientation='horizontal', expand_x=True,
@@ -315,8 +322,9 @@ def make_window1(session, project, gan, im_page):
                                                         orientation='horizontal', expand_x=True,
                                                         key='-CONTROL_CHILDREN-', default_value=10,
                                                         enable_events=True)])
-    img_control.append([sg.Button('Create Children', key='-CREATE_CHILDREN-'), sg.Button('Save Child', key='-SAVE_CHILD-')])
-    img_sel = [[sg.Text('Selected image:')], [sg.Image(key='-SEL_IMAGE-', size=(512, 256))]]
+    img_control.append([sg.Button('Create Children', key='-CREATE_CHILDREN-')])
+    img_sel = [[sg.Text('Selected image:')], [sg.Image(key='-SEL_IMAGE-', size=(512, 256))],
+               [sg.Button('Save Child', key='-SAVE_CHILD-')]]
 
     img_children = [[sg.Text('Children:')]]
     for x in range(IM_CHILDREN_SIZE[0]):
@@ -327,14 +335,14 @@ def make_window1(session, project, gan, im_page):
     layout = [[sg.Column(img_sel), sg.Column(img_control, expand_x=True)],
               [sg.Column(img_browser_row), sg.Column(img_children)]]
 
-    return sg.Window('Image Browser', layout, size=(1200, 1000), finalize=True)
+    return sg.Window('Image Browser', layout, size=size['size'], finalize=True)
 
 
-def make_window2(session, project, im_page):
+def make_window2(session, project, im_page, size):
     img_sel = [[sg.Text('Selected image:')],
                [sg.Image(key='-SEL_IMAGE-', size=(512, 256))],
                [sg.Button('Add To Timeline', key='-ADD_TO_TIMELINE-', enable_events=True)]]
-    img_browser_row = get_image_page(session, project, im_page, IM_GALLERY_SIZE_TIMELINE)
+    img_browser_row = get_image_page(session, project, im_page, IM_GALLERY_SIZE_TIMELINE, size)
     timeline = []
     for i in range(IM_GALLERY_SIZE_TIMELINE[1]):
         item = sg.Column([[sg.Image(filename=PLACEHOLDER_IM_PATH, size=(128, 64), key=('-TIMELINE_IMAGE-', i), subsample=2)],
@@ -349,16 +357,20 @@ def make_window2(session, project, im_page):
     timeline_controls = [[sg.Text('Interpolation:'), sg.Combo(['linear', 'sine'], default_value='linear', key='-TIMELINE_INTERP-', enable_events=True)],
                          [sg.Text('Frames:'), sg.InputText(default_text='1000', key='-TIME_LINE_FRAMES-', enable_events=True)],
                          [sg.Text('Loop:'), sg.Checkbox('', default=True, key='-TIMELINE_LOOP-', enable_events=True)],
+                         [sg.Text('Folder: '), sg.Text(size=(50, 1), enable_events=True, key='-TIMELINE_EXPORT_PATH-'), sg.FolderBrowse()],
                          [sg.Button('Export', key='-TIMELINE_EXPORT-', enable_events=True)]]
 
     layout = [[sg.Column(img_sel), sg.Column(timeline_controls)], [timeline], [timeline_navigation], [sg.Column(img_browser_row)]]
 
-    return sg.Window('Timeline', layout, size=(1200, 1000), finalize=True)
+    return sg.Window('Timeline', layout, size=size['size'], finalize=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description='Latent Space GUI')
     parser.add_argument('-p', '--project_path', type=str, help='the path to the project folder, doesnt have to exist yet')
+    parser.add_argument('--small', dest='is_small', action='store_true')
+    parser.add_argument('--large', dest='is_small', action='store_false')
+    parser.set_defaults(is_small=True)
 
     args = parser.parse_args()
 
@@ -367,6 +379,13 @@ def main():
     if not os.path.isdir(project_path):
         print('you entered the wrong directory')
         sys.exit()
+
+    if args.is_small:
+        size = WINDOW_SMALL
+    else:
+        size = WINDOW_BIG
+
+    # print(size)
 
     gan = GAN(project_path)
     gen_img_path = os.path.join(project_path, 'images', 'generated')
@@ -388,6 +407,7 @@ def main():
     control_data = [[[[0. for _ in range(gan.num_labels)]]], 0.5, 10]
     im_sel_child = None
     children_ims = []
+    export_path = ''
 
     project = session.query(Project).filter_by(path=project_path).first()
     if project is None:
@@ -407,9 +427,9 @@ def main():
     sg.theme('DarkAmber')
 
     # # Create the Windows
-    window2, window1= make_window2(session, project, im_page_timeline), make_window1(session, project, gan, im_page_browser)
+    window2, window1= make_window2(session, project, im_page_timeline, size), make_window1(session, project, gan, im_page_browser, size)
 
-    update_timeline(window2, timelines, timeline_offset)
+    update_timeline(window2, timelines, timeline_offset, size)
 
     # Event Loop to process "events" and get the "values" of the inputs
     while True:
@@ -444,17 +464,17 @@ def main():
                 print(removed_item)
                 session.delete(removed_item)
                 session.commit()
-                update_timeline(window, timelines, timeline_offset)
+                update_timeline(window, timelines, timeline_offset, size)
 
         else:
             if event == '-NEXT_PAGE-':
                 if window == window1:
                     new_page = im_page_browser + 1
-                    if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_BROWSER):
+                    if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_BROWSER, size):
                         im_page_browser = new_page
                 elif window == window2:
                     new_page = im_page_timeline + 1
-                    if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE):
+                    if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE, size):
                         im_page_timeline = new_page
 
             if event == '-PREV_PAGE-':
@@ -463,14 +483,14 @@ def main():
                     if im_page_browser <= 0:
                         im_page_browser = 0
                     else:
-                        if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_BROWSER):
+                        if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_BROWSER, size):
                             im_page_browser = new_page
                 elif window == window2:
                     new_page = im_page_timeline - 1
                     if im_page_timeline <= 0:
                         im_page_timeline = 0
                     else:
-                        if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE):
+                        if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE, size):
                             im_page_timeline = new_page
 
             if event == '-CONTROL_RANDOM-':
@@ -486,15 +506,20 @@ def main():
 
             if event == '-CREATE_CHILDREN-':
                 create_children(session, gan, im_sel_id_browser, control_data)
-                children_ims = show_children(session, gan, window)
+                children_ims = show_children(session, gan, window, size)
 
             if event == '-SAVE_CHILD-':
                 save_image(session, gan, project, im_sel_child, gen_img_path)
 
+            if event == '-RESET_LABEL-':
+                for i in range(gan.num_labels):
+                    window[f'-CONTROL_LABEL_{i}-'].update(value=0)
+                    control_data[0][0][0][i] = 0
+
             if event == '-ADD_TO_TIMELINE-':
                 timelines = add_image_to_timeline(session, project, im_sel_id_timeline, im_sel_id_timeline_pos)
                 im_sel_id_timeline_pos += 1
-                update_timeline(window, timelines, timeline_offset)
+                update_timeline(window, timelines, timeline_offset, size)
 
             #if event == '-REMOVE_FROM_TIMELINE-':
             #   print('remove from timeline')
@@ -502,15 +527,15 @@ def main():
             if event == '-PREV_TIMELINE-':
                 if not timeline_offset <= 0:
                     timeline_offset -= 1
-                    update_timeline(window, timelines, timeline_offset)
+                    update_timeline(window, timelines, timeline_offset, size)
 
             if event == '-NEXT_TIMELINE-':
                 timeline_offset += 1
-                update_timeline(window, timelines, timeline_offset)
+                update_timeline(window, timelines, timeline_offset, size)
 
             if event == '-UPDATE_ORDER-':
                 timelines = session.query(Timeline).filter_by(project=project).order_by(asc(Timeline.order)).all()
-                update_timeline(window, timelines, timeline_offset)
+                update_timeline(window, timelines, timeline_offset, size)
 
             if event == '-TIMELINE_INTERP-':
                 timeline_interp = values[event]
@@ -521,8 +546,12 @@ def main():
             if event == '-TIMELINE_LOOP-':
                 timeline_loop = values[event]
 
+            if event == '-TIMELINE_EXPORT_PATH-':
+                export_path = values['-TIMELINE_EXPORT_PATH-']
+
             if event == '-TIMELINE_EXPORT-':
-                export_timeline(gan, timelines, timeline_frames, timeline_loop, timeline_interp, timeline_img_path)
+                if export_path != "":
+                    export_timeline(gan, timelines, timeline_frames, timeline_loop, timeline_interp, export_path)
 
 
 if __name__ == '__main__':

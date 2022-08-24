@@ -273,26 +273,6 @@ def interp(points, step_count, method):
         raise ValueError('Interpolation method does not exist: {}'.format(method))
 
 
-# def lin_interp(points, step_count):
-#     def lin_interp1d(y):
-#         x = np.linspace(0., 1., len(y))
-#         f = interpolate.interp1d(x, y)
-#         xnew = np.linspace(0., 1., step_count)
-#         return f(xnew)
-#     return np.apply_along_axis(lin_interp, 0, points)
-#
-#
-# def cubic_spline_interp(points, step_count):
-#     def cubic_spline_interp1d(y):
-#         x = np.linspace(0., 1., len(y))
-#         tck = interpolate.splrep(x, y, s=0)
-#         xnew = np.linspace(0., 1., step_count)
-#         return interpolate.splev(xnew, tck, der=0)
-#     if points.shape[0] < 4:
-#         raise ValueError('Too few points for cubic interpolation: need 4, got {}'.format(points.shape[0]))
-#     return np.apply_along_axis(cubic_spline_interp1d, 0, points)
-
-
 def export_timeline(gan, ims, frames, loop, interp_method, path, window):
     global timeline_export_done
     window['-TIMELINE_EXPORT-'].update(disabled=True)
@@ -393,7 +373,7 @@ def make_window2(session, project, im_page, size):
                          sg.Button('Update Order', key='-UPDATE_ORDER-', enable_events=True),
                          sg.Button('Next', key='-NEXT_TIMELINE-', enable_events=True)]
 
-    timeline_controls = [[sg.Text('Interpolation:'), sg.Combo(['linear', 'cubic'], default_value='linear', key='-TIMELINE_INTERP-', enable_events=True)],
+    timeline_controls = [[sg.Text('Interpolation:'), sg.Combo(['linear', 'cubic'], default_value='cubic', key='-TIMELINE_INTERP-', enable_events=True)],
                          [sg.Text('Frames:'), sg.InputText(default_text='1000', key='-TIME_LINE_FRAMES-', enable_events=True)],
                          [sg.Text('Loop:'), sg.Checkbox('', default=True, key='-TIMELINE_LOOP-', enable_events=True)],
                          [sg.Text('Folder: '), sg.In(size=(50, 1), enable_events=True, key='-TIMELINE_EXPORT_PATH-'), sg.FolderBrowse()],

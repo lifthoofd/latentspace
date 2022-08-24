@@ -31,7 +31,9 @@ DATABASE_PATH = os.path.join(BASE_PATH, 'gui.db')
 PLACEHOLDER_IM_PATH = os.path.join(BASE_PATH, 'placeholder.png')
 
 TIMELINE_INTERP_LINEAR = 'linear'
-TIMELINE_INTERP_SINE = 'sine'
+TIMELINE_INTERP_CUBIC = 'cubic'
+
+timeline_export_done = 0.0
 
 
 class GAN:
@@ -80,8 +82,8 @@ def init_img_folder(gan, path, project, session):
         labels = [i] * 10
         y = gan.one_hot(labels, gan.num_labels)
         
-        print(z.shape)
-        print(y.shape)
+        # print(z.shape)
+        # print(y.shape)
 
         images = gan.generate_image(z, y)
 
@@ -134,7 +136,7 @@ def update_image_page(session, project, page, window, size, conf):
         return False
 
 
-def update_sel_image_browser(session, project, page, data, window, size):
+def update_sel_image_browser(session, project, page, data, window, size, control_data):
     offset = page * (size[0] * size[1])
     im = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (data[0] * size[1])).limit(size[1]).all()[data[1]]
     window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256))
@@ -142,6 +144,7 @@ def update_sel_image_browser(session, project, page, data, window, size):
     y = pickle.loads(im.y)
     for i in range(len(y[0][0][0])):
         window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][0][i])
+        control_data[0][0][0][i] = y[0][0][0][i]
 
     return im.id
     
@@ -180,7 +183,7 @@ def create_children(session, gan, im_id, data):
         for i in range(amount):
             z_mod = np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32') * rand
             new_z = z + z_mod
-            print(new_z)
+            # print(new_z)
             new_child = Child(z=pickle.dumps(new_z), y=pickle.dumps(y))
             session.add(new_child)
             session.commit()
@@ -217,7 +220,7 @@ def show_children(session, gan, window, conf):
 def save_image(session, gan, project, data, path):
     index = data[1] * IM_CHILDREN_SIZE[0] + data[0]
     child = session.query(Child).order_by(asc(Child.id)).all()[index]
-    print(pickle.loads(child.z))
+    # print(pickle.loads(child.z))
     image = gan.generate_image(z=pickle.loads(child.z), y=pickle.loads(child.y))
     image = image * 127.5 + 127.5
     fn = gen_filename('.png')
@@ -246,19 +249,54 @@ def update_timeline(window, timelines, offset, conf):
         window[('-TIMELINE_ORDER-', i)].update(value=str(tls[i].order))
 
 
-def cubic_spline_interp(points, step_count):
+def interp(points, step_count, method):
+    def lin_interp1d(y):
+        x = np.linspace(0., 1., len(y))
+        f = interpolate.interp1d(x, y)
+        xnew = np.linspace(0., 1., step_count)
+        return f(xnew)
+
     def cubic_spline_interp1d(y):
         x = np.linspace(0., 1., len(y))
         tck = interpolate.splrep(x, y, s=0)
         xnew = np.linspace(0., 1., step_count)
         return interpolate.splev(xnew, tck, der=0)
+
     if points.shape[0] < 4:
-        raise ValueError('Too few points for cubic interpolation: need 4, got {}'.format(points.shape[0]))
-    return np.apply_along_axis(cubic_spline_interp1d, 0, points)
+        raise ValueError('Too few points for interpolation: need 4, got {}'.format(points.shape[0]))
+
+    if method == 'linear':
+        return np.apply_along_axis(lin_interp1d, 0, points)
+    elif method == 'cubic':
+        return np.apply_along_axis(cubic_spline_interp1d, 0, points)
+    else:
+        raise ValueError('Interpolation method does not exist: {}'.format(method))
 
 
-def export_timeline(gan, timelines, frames, loop, interp, path):
-    ims = [tl.image for tl in timelines]
+# def lin_interp(points, step_count):
+#     def lin_interp1d(y):
+#         x = np.linspace(0., 1., len(y))
+#         f = interpolate.interp1d(x, y)
+#         xnew = np.linspace(0., 1., step_count)
+#         return f(xnew)
+#     return np.apply_along_axis(lin_interp, 0, points)
+#
+#
+# def cubic_spline_interp(points, step_count):
+#     def cubic_spline_interp1d(y):
+#         x = np.linspace(0., 1., len(y))
+#         tck = interpolate.splrep(x, y, s=0)
+#         xnew = np.linspace(0., 1., step_count)
+#         return interpolate.splev(xnew, tck, der=0)
+#     if points.shape[0] < 4:
+#         raise ValueError('Too few points for cubic interpolation: need 4, got {}'.format(points.shape[0]))
+#     return np.apply_along_axis(cubic_spline_interp1d, 0, points)
+
+
+def export_timeline(gan, ims, frames, loop, interp_method, path, window):
+    global timeline_export_done
+    window['-TIMELINE_EXPORT-'].update(disabled=True)
+    # ims = [tl.image for tl in timelines]
     if loop:
         ims.append(ims[0])
 
@@ -267,29 +305,14 @@ def export_timeline(gan, timelines, frames, loop, interp, path):
 
     for im in ims:
         z_keys.append(pickle.loads(im.z))
-        print(pickle.loads(im.z))
+        # print(pickle.loads(im.z))
         y_keys.append(pickle.loads(im.y))
     
     z_keys = np.asarray(z_keys)
     y_keys = np.asarray(y_keys)
 
-    if interp == TIMELINE_INTERP_LINEAR:
-        z_seq = cubic_spline_interp(z_keys, frames)
-        y_seq = cubic_spline_interp(y_keys, frames)
-    else:
-        return
-
-    gen_ims = []
-    for i in range(z_seq.shape[0]):
-        print(f'generating frame {i}')
-        z = z_seq[i].reshape(-1, 1, 1, gan.z_dim)
-        y = y_seq[i].reshape(-1, 1, 1, gan.num_labels)
-        gen_im = gan.generate_image(z, y)
-        gen_im = gen_im * 127.5 + 127.5
-        gen_im = np.uint8(gen_im)
-        gen_ims.append(gen_im)
-
-    gen_ims = np.asarray(gen_ims)
+    z_seq = interp(z_keys, frames, interp_method)
+    y_seq = interp(y_keys, frames, interp_method)
 
     if not os.path.isdir(path):
         os.makedirs(path)
@@ -297,10 +320,23 @@ def export_timeline(gan, timelines, frames, loop, interp, path):
         shutil.rmtree(path)
         os.makedirs(path)
 
-    for i, im in enumerate(gen_ims):
+    # TODO: combine the below two loops
+    # gen_ims = []
+    for i in range(z_seq.shape[0]):
+        # print(f'generating frame {i}')
+        z = z_seq[i].reshape(-1, 1, 1, gan.z_dim)
+        y = y_seq[i].reshape(-1, 1, 1, gan.num_labels)
+        gen_im = gan.generate_image(z, y)
+        gen_im = gen_im * 127.5 + 127.5
+        gen_im = np.uint8(gen_im)
+        # gen_ims.append(gen_im)
         file_path = os.path.join(path, f'{i:09d}.png')
-        print(f'saving file: {file_path}')
-        tf.io.write_file(file_path, tf.image.encode_png(tf.cast(im[0], tf.uint8)))
+        # print(f'saving file: {file_path}')
+        timeline_export_done = int((i / (z_seq.shape[0] - 1)) * 100)
+        window['-TIMELINE_EXPORT_PROGRESS-'].update_bar(timeline_export_done)
+        tf.io.write_file(file_path, tf.image.encode_png(tf.cast(gen_im[0], tf.uint8)))
+
+    window['-TIMELINE_EXPORT-'].update(disabled=False)
 
 
 def make_window1(session, project, gan, im_page, size):
@@ -357,11 +393,11 @@ def make_window2(session, project, im_page, size):
                          sg.Button('Update Order', key='-UPDATE_ORDER-', enable_events=True),
                          sg.Button('Next', key='-NEXT_TIMELINE-', enable_events=True)]
 
-    timeline_controls = [[sg.Text('Interpolation:'), sg.Combo(['linear', 'sine'], default_value='linear', key='-TIMELINE_INTERP-', enable_events=True)],
+    timeline_controls = [[sg.Text('Interpolation:'), sg.Combo(['linear', 'cubic'], default_value='linear', key='-TIMELINE_INTERP-', enable_events=True)],
                          [sg.Text('Frames:'), sg.InputText(default_text='1000', key='-TIME_LINE_FRAMES-', enable_events=True)],
                          [sg.Text('Loop:'), sg.Checkbox('', default=True, key='-TIMELINE_LOOP-', enable_events=True)],
                          [sg.Text('Folder: '), sg.In(size=(50, 1), enable_events=True, key='-TIMELINE_EXPORT_PATH-'), sg.FolderBrowse()],
-                         [sg.Button('Export', key='-TIMELINE_EXPORT-', enable_events=True)]]
+                         [sg.Button('Export', key='-TIMELINE_EXPORT-', enable_events=True), sg.ProgressBar(key='-TIMELINE_EXPORT_PROGRESS-', max_value=100, orientation='horizontal', size_px=(150, 30))]]
 
     layout = [[sg.Column(img_sel), sg.Column(timeline_controls)], [timeline], [timeline_navigation], [sg.Column(img_browser_row)]]
 
@@ -369,6 +405,7 @@ def make_window2(session, project, im_page, size):
 
 
 def main():
+    global timeline_export_done
     parser = argparse.ArgumentParser(description='Latent Space GUI')
     parser.add_argument('-p', '--project_path', type=str, help='the path to the project folder, doesnt have to exist yet')
     parser.add_argument('--small', dest='is_small', action='store_true')
@@ -392,7 +429,7 @@ def main():
 
     gan = GAN(project_path)
     gen_img_path = os.path.join(project_path, 'images', 'generated')
-    timeline_img_path = os.path.join(project_path, 'images', 'timeline')
+    # timeline_img_path = os.path.join(project_path, 'images', 'timeline')
 
     engine = create_engine(f'sqlite:///{DATABASE_PATH}')
     Base.metadata.bind = engine
@@ -446,14 +483,14 @@ def main():
         if len(event) == 2:
             if event[0] == '-IMAGE-':
                 if window == window1:
-                    im_sel_id_browser = update_sel_image_browser(session, project, im_page_browser, event[1], window, IM_GALLERY_SIZE_BROWSER)
+                    im_sel_id_browser = update_sel_image_browser(session, project, im_page_browser, event[1], window, IM_GALLERY_SIZE_BROWSER, control_data)
                 elif window == window2:
                     im_sel_id_timeline = update_sel_image_timeline(session, project, im_page_timeline, event[1], window, IM_GALLERY_SIZE_TIMELINE)
 
             if event[0] == '-IMAGE_CHILDREN-':
                 im_sel_child = event[1]
-                print(im_sel_child)
-                print(im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0])
+                # print(im_sel_child)
+                # print(im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0])
                 update_sel_image_child(window, children_ims[im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0]])
 
             if event[0] == '-TIMELINE_ORDER-':
@@ -508,6 +545,7 @@ def main():
                 control_data[0][0][0][index] = data
 
             if event == '-CREATE_CHILDREN-':
+                # print(control_data)
                 create_children(session, gan, im_sel_id_browser, control_data)
                 children_ims = show_children(session, gan, window, size)
 
@@ -556,8 +594,11 @@ def main():
             if event == '-TIMELINE_EXPORT-':
                 # print(export_path)
                 if export_path != "":
-                    worker = threading.Thread(target=export_timeline, args=(gan, timelines, timeline_frames, timeline_loop, timeline_interp, export_path))
+                    worker = threading.Thread(target=export_timeline, args=(gan, [tl.image for tl in timelines], timeline_frames, timeline_loop, timeline_interp, export_path, window))
                     worker.start()
+
+                    # while timeline_export_done < 1.0:
+                    #     print(f'saving timeline: {timeline_export_done}')
                     # export_timeline(gan, timelines, timeline_frames, timeline_loop, timeline_interp, export_path)
 
 

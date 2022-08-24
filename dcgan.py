@@ -22,7 +22,8 @@ SUMMARY_FREQ = 4
 class DCGAN:
     def __init__(self, config):
         self.num_epochs = int(config['num_epochs'])
-        self.batch_size = 32
+
+        self.batch_size = 128
         self.z_dim = 100
         self.learning_rate_gen = float(config['learning_rate_gen'])
         self.learning_rate_disc = float(config['learning_rate_disc'])

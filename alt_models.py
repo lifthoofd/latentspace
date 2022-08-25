@@ -20,7 +20,7 @@ class AdaptiveAugmenter(keras.Model):
         # are the most helpful in the low-data regime
         self.augmenter = keras.Sequential(
             [
-                keras.layers.InputLayer(input_shape=(512, 256, 3)),
+                keras.layers.InputLayer(input_shape=(256, 512, 3)),
                 # blitting/x-flip:
                 keras.layers.RandomFlip("horizontal"),
                 # blitting/integer translation:

@@ -270,7 +270,7 @@ class DCGAN:
                         print('epoch {:04d} | step {:08d} | generator loss: {} | discriminator loss {} | augmenter prob: {}'.format(epoch, step,
                                                                                                                                     gen_loss,
                                                                                                                                     disc_loss,
-                                                                                                                                    self.augmenter.probability))
+                                                                                                                                    self.augmenter.probability.numpy()))
                     if step % SUMMARY_FREQ == 0:
                         with self.summary_writer.as_default():
                             if gen_loss is not None:

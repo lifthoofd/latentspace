@@ -61,7 +61,7 @@ class AdaptiveAugmenter(keras.Model):
         accuracy_error = current_accuracy - 0.85
         self.probability.assign(
             tf.clip_by_value(
-                self.probability + accuracy_error / 1000, 0.0, 1.0
+                self.probability + accuracy_error / 1000.0, 0.0, 1.0
             )
         )
 

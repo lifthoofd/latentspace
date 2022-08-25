@@ -80,7 +80,7 @@ def plot_images(images, log2_res, fname=''):
     if fname:
         print("image name", fname)
         f.savefig(fname)
-        
+
         
 class PixelNorm(Layer):
     def __init__(self, epsilon=1e-8):
@@ -145,8 +145,9 @@ class Conv2D(Layer):
         
         fan_in = self.kernel*self.kernel*self.in_channels
         self.scale = tf.sqrt(self.gain/fan_in)
-        
-    def call(self, inputs):
+
+    # TODO: get rid of all errors by adding kwargs in the other layers
+    def call(self, inputs, **kwargs):
         if self.pad:
             x = tf.pad(inputs, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='REFLECT')
         else:

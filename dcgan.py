@@ -77,8 +77,10 @@ class DCGAN:
         # make weight init
         self.weight_init = tf.keras.initializers.TruncatedNormal(stddev=0.02, mean=0.0)
         # make cross entropy function
-        self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        # self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
+        # make augmenter
+        self.augmenter = models.AdaptiveAugmenter()
         # make generator
         self.generator = models.make_generator_model(self.num_labels, self.z_dim, self.weight_init, self.bn_momentum, self.image_size, self.aspect, self.filters)
         # make discriminator
@@ -214,9 +216,11 @@ class DCGAN:
     @tf.function
     def train_d(self, x_real, y_real, y_real_expanded):
         z = tf.random.normal((self.batch_size, 1, 1, self.z_dim))
+        x_real = self.augmenter(x_real, training=True)
 
         with tf.GradientTape() as disc_tape:
             x_fake = self.generator([z, y_real], training=True)
+            x_fake = self.augmenter(x_fake, training=True)
             fake_logits = self.discriminator([x_fake, y_real_expanded], training=True)
 
             real_logits = self.discriminator([x_real, y_real_expanded], training=True)
@@ -226,6 +230,9 @@ class DCGAN:
 
         grad = disc_tape.gradient(cost, self.discriminator.trainable_variables)
         self.discriminator_optimizer.apply_gradients(zip(grad, self.discriminator.trainable_variables))
+
+        self.augmenter.update(real_logits)
+
         return cost
 
     def train(self):
@@ -234,6 +241,7 @@ class DCGAN:
         self.is_training = True
         gen_loss_mean = tf.keras.metrics.Mean(name='generator loss')
         disc_loss_mean = tf.keras.metrics.Mean(name='discriminator loss')
+        aug_prob_mean = tf.keras.metrics.Mean(name='augmenter probability')
 
         # start tensorboard
         tensorboard = subprocess.Popen(['tensorboard', '--logdir', self.summary_path, '--bind_all'])
@@ -255,21 +263,25 @@ class DCGAN:
                     self.losses['disc'] = float(disc_loss.numpy())
 
                     disc_loss_mean.update_state(disc_loss)
+                    aug_prob_mean.update_state(self.augmenter.probability)
 
                     if step % self.log_freq == 0:
                         # print(self.is_training)
-                        print('epoch {:04d} | step {:08d} | generator loss: {} | discriminator loss {}'.format(epoch, step,
-                                                                                                               gen_loss,
-                                                                                                               disc_loss))
+                        print('epoch {:04d} | step {:08d} | generator loss: {} | discriminator loss {} | augmenter prob: {}'.format(epoch, step,
+                                                                                                                                    gen_loss,
+                                                                                                                                    disc_loss,
+                                                                                                                                    self.augmenter.probability))
                     if step % SUMMARY_FREQ == 0:
                         with self.summary_writer.as_default():
                             if gen_loss is not None:
                                 tf.summary.scalar('generator loss', gen_loss_mean.result(), step=step)
                             tf.summary.scalar('discriminator loss', disc_loss_mean.result(), step=step)
+                            tf.summary.scalar('augmenter probability', aug_prob_mean.result(), step=step)
 
                         if gen_loss is not None:
                             gen_loss_mean.reset_states()
                         disc_loss_mean.reset_states()
+                        aug_prob_mean.reset_states()
 
                         self.summary_writer.flush()
 

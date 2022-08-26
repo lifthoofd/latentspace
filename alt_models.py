@@ -162,7 +162,7 @@ def make_discriminator_model(y_dim, weight_init, image_size):
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     x = keras.layers.Flatten()(x)
-    x = keras.layers.Dropout(0.4)
+    x = keras.layers.Dropout(0.4)(x)
     x = keras.layers.Dense(1)(x)
 
     return keras.models.Model([im, y], x, name='discriminator')

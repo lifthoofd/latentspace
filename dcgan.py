@@ -170,13 +170,13 @@ class DCGAN:
         return one_hot_labels, expanded_labels
 
     @tf.function
-    def train_step(self, batch):
-        real_images, real_labels = batch
+    def train_step(self, real_images, y_real_expanded, y_fake, y_fake_expanded):
+        # real_images, real_labels = batch
         real_images = self.augmenter(real_images, training=True)
-        y_real, y_real_expanded = tf.py_function(func=self.expand_labels, inp=[real_labels, self.num_labels], Tout=tf.float32)
+        # y_real, y_real_expanded = tf.py_function(func=self.expand_labels, inp=[real_labels, self.num_labels], Tout=tf.float32)
 
-        fake_labels = [randint(0, self.num_labels - 1) for _ in range(self.batch_size)]
-        y_fake, y_fake_expanded = tf.py_function(func=self.expand_labels, inp=[fake_labels, self.num_labels], Tout=tf.float32)
+        # fake_labels = [randint(0, self.num_labels - 1) for _ in range(self.batch_size)]
+        # y_fake, y_fake_expanded = tf.py_function(func=self.expand_labels, inp=[fake_labels, self.num_labels], Tout=tf.float32)
 
         with tf.GradientTape(persistent=True) as tape:
             latent_samples = tf.random.normal((self.batch_size, 1, 1, self.z_dim))
@@ -217,13 +217,17 @@ class DCGAN:
                 for batch in self.dataset:
                     step = self.checkpoint.step.numpy()
 
-                    # fake_labels = [randint(0, self.num_labels - 1) for _ in range(self.batch_size)]
-                    # y_fake, y_fake_expanded = self.expand_labels(fake_labels, self.num_labels)
-                    #
-                    # real_images, real_labels = batch
-                    # y_real, y_real_expanded = self.expand_labels(real_labels, self.num_labels)
+                    fake_labels = [randint(0, self.num_labels - 1) for _ in range(self.batch_size)]
+                    y_fake, y_fake_expanded = self.expand_labels(fake_labels, self.num_labels)
 
-                    gen_loss, disc_loss = self.train_step(batch)
+                    real_images, real_labels = batch
+                    y_real, y_real_expanded = self.expand_labels(real_labels, self.num_labels)
+
+                    y_real_expanded_tensor = tf.convert_to_tensor(y_real_expanded)
+                    y_fake_tensor = tf.convert_to_tensor(y_fake)
+                    y_fake_expanded_tensor = tf.convert_to_tensor(y_fake_expanded)
+
+                    gen_loss, disc_loss = self.train_step(real_images, y_real_expanded_tensor, y_fake_tensor, y_fake_expanded_tensor)
 
                     if gen_loss is not None:
                         self.losses['gen'] = float(gen_loss.numpy())

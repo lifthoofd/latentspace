@@ -4,6 +4,7 @@ import time
 import json
 from random import randint
 # import gc
+import keras.losses
 import tensorflow as tf
 import numpy as np
 import datetime
@@ -139,31 +140,16 @@ class DCGAN:
         outputs = tf.stack(op_list)
         return outputs
 
-    @staticmethod
-    def discriminator_loss(real_output, fake_output):
-        fake_loss = tf.reduce_mean(fake_output)
-        real_loss = tf.reduce_mean(real_output)
-        return fake_loss - real_loss
+    def adverserial_loss(self, real_logits, generated_logits, real_labels, generated_labels):
+        generator_loss = keras.losses.binary_crossentropy(real_labels, generated_logits, from_logits=True)
 
-    @staticmethod
-    def generator_loss(fake_output):
-        fake_loss = -tf.reduce_mean(fake_output)
-        return fake_loss
+        discriminator_loss = keras.losses.binary_crossentropy(
+            tf.concat([real_labels, generated_labels], axis=0),
+            tf.concat([real_logits, generated_logits], axis=0),
+            from_logits=True
+        )
 
-    def gradient_penalty(self, f, real, fake, labels):
-        alpha = tf.random.uniform([self.batch_size, 1, 1, 1], 0., 1.)
-        diff = fake - real
-        inter = real + (alpha * diff)
-
-        with tf.GradientTape() as t:
-            t.watch(inter)
-            pred = f([inter, labels])
-
-        grad = t.gradient(pred, [inter])[0]
-        slopes = tf.sqrt(tf.reduce_sum(tf.square(grad), axis=[1, 2, 3]))
-        gp = tf.reduce_mean((slopes - 1.) ** 2)
-
-        return gp
+        return tf.reduce_mean(generator_loss), tf.reduce_mean(discriminator_loss)
 
     @staticmethod
     def one_hot(labels, num_labels):
@@ -178,62 +164,33 @@ class DCGAN:
         expanded_labels = one_hot_labels * np.ones([M, img_size[0], img_size[1], num_labels], dtype=np.float32)
         return one_hot_labels, expanded_labels
 
+    @tf.functon
     def train_step(self, batch, step):
-        imgs, labels = batch
-        y_real = self.one_hot(labels, self.num_labels)
-        _, y_real_expanded = self.expand_labels(labels, self.num_labels)
+        real_images, real_labels = batch
+        real_images = self.augmenter(real_images, training=True)
+        y_real, y_real_expanded = self.expand_labels(real_labels, self.num_labels)
 
-        # disc_loss = 0
+        with tf.GradientTape(persistent=True) as tape:
+            latent_samples = tf.random.normal((self.batch_size, 1, 1, self.z_dim))
+            fake_labels = [randint(0, self.num_labels - 1) for _ in range(self.batch_size)]
+            y_fake, y_fake_expanded = self.expand_labels(fake_labels, self.num_labels)
 
-        # for _ in range(self.n_critics):
-        #     disc_loss = self.train_d(imgs, y_real, y_real_expanded)
+            generated_images = self.generator([latent_samples, y_fake], training=True)
+            generated_images = self.augmenter(generated_images, training=True)
 
-        disc_loss = self.train_d(imgs, y_real, y_real_expanded)
-        if step % self.n_critics == 0:
-            gen_loss = self.train_g()
-        else:
-            gen_loss = None
+            real_logits = self.discriminator([real_images, y_real_expanded], training=True)
+            generated_logits = self.discriminator([generated_images, y_fake_expanded], training=True)
 
-        return gen_loss, disc_loss
+            gen_loss, disc_loss = self.adverserial_loss(real_logits, generated_logits, y_real, y_fake)
 
-    @tf.function
-    def train_g(self):
-        z = tf.random.normal((self.batch_size, 1, 1, self.z_dim))
-        labels = [randint(0, self.num_labels - 1) for _ in range(self.batch_size)]
-        y = self.one_hot(labels, self.num_labels)
-        _, y_expanded = self.expand_labels(labels, self.num_labels)
-
-        with tf.GradientTape() as gen_tape:
-            x_fake = self.generator([z, y], training=True)
-            fake_logits = self.discriminator([x_fake, y_expanded], training=True)
-            loss = self.generator_loss(fake_logits)
-
-        grad = gen_tape.gradient(loss, self.generator.trainable_variables)
-        self.generator_optimizer.apply_gradients(zip(grad, self.generator.trainable_variables))
-
-        return loss
-
-    @tf.function
-    def train_d(self, x_real, y_real, y_real_expanded):
-        z = tf.random.normal((self.batch_size, 1, 1, self.z_dim))
-        x_real = self.augmenter(x_real, training=True)
-
-        with tf.GradientTape() as disc_tape:
-            x_fake = self.generator([z, y_real], training=True)
-            x_fake = self.augmenter(x_fake, training=True)
-            fake_logits = self.discriminator([x_fake, y_real_expanded], training=True)
-
-            real_logits = self.discriminator([x_real, y_real_expanded], training=True)
-            cost = self.discriminator_loss(real_logits, fake_logits)
-            gp = self.gradient_penalty(partial(self.discriminator, training=True), x_real, x_fake, y_real_expanded)
-            cost += self.gp_mult * gp
-
-        grad = disc_tape.gradient(cost, self.discriminator.trainable_variables)
-        self.discriminator_optimizer.apply_gradients(zip(grad, self.discriminator.trainable_variables))
+        generator_gradients = tape.gradient(gen_loss, self.generator.trainable_weights)
+        discriminator_gradients = tape.gradient(disc_loss, self.discriminator.trainable_weights)
+        self.generator_optimizer.apply_gradients(zip(generator_gradients, self.generator.trainable_weights))
+        self.discriminator_optimizer.apply_gradients(zip(discriminator_gradients, self.discriminator.trainable_weights))
 
         self.augmenter.update(real_logits)
 
-        return cost
+        return gen_loss, disc_loss
 
     def train(self):
         epoch_offset = self.checkpoint.epoch.numpy()

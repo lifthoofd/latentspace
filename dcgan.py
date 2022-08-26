@@ -141,6 +141,9 @@ class DCGAN:
         return outputs
 
     def adverserial_loss(self, real_logits, generated_logits, real_labels, generated_labels):
+        real_labels = tf.ones(shape=(128, 1))
+        generated_labels = tf.zeros(shape=(128, 1))
+
         generator_loss = keras.losses.binary_crossentropy(real_labels, generated_logits, from_logits=True)
 
         discriminator_loss = keras.losses.binary_crossentropy(

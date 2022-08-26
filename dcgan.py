@@ -16,6 +16,8 @@ from dataset import DatasetPipeline
 # import dcgan.models as models
 import alt_models as models
 
+tf.get_logger().setLevel('ERROR')
+
 
 SUMMARY_FREQ = 4
 

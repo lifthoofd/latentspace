@@ -46,7 +46,7 @@ class AdaptiveAugmenter(keras.Model):
             # during training either the original or the augmented images are selected
             # based on self.probability
             augmentation_values = tf.random.uniform(
-                shape=(64, 1, 1, 1), minval=0.0, maxval=1.0
+                shape=(128, 1, 1, 1), minval=0.0, maxval=1.0
             )
             augmentation_bools = tf.math.less(augmentation_values, self.probability)
 
@@ -66,7 +66,7 @@ class AdaptiveAugmenter(keras.Model):
         )
 
 
-def make_generator_model(y_dim, z_dim):
+def make_generator_model(y_dim, z_dim, weight_init):
     z = keras.layers.Input(shape=(1, 1, z_dim))
     y = keras.layers.Input(shape=(1, 1, y_dim,))
 
@@ -74,7 +74,7 @@ def make_generator_model(y_dim, z_dim):
 
     start_size = (2, 4)
 
-    x = keras.layers.Dense(start_size[0] * start_size[1] * 1024, use_bias=False)(gen_in)
+    x = keras.layers.Dense(start_size[0] * start_size[1] * 1024, use_bias=False, kernel_initializer=weight_init)(gen_in)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
     x = keras.layers.Reshape(target_shape=(start_size[0], start_size[1], 1024))(x)
@@ -85,37 +85,37 @@ def make_generator_model(y_dim, z_dim):
     # x = keras.layers.ReLU()(x)
 
     # 4, 8
-    x = keras.layers.Conv2DTranspose(1024, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2DTranspose(1024, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
 
     # 8, 16
-    x = keras.layers.Conv2DTranspose(512, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2DTranspose(512, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
 
     # 16, 32
-    x = keras.layers.Conv2DTranspose(256, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2DTranspose(256, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
 
     # 32, 64
-    x = keras.layers.Conv2DTranspose(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2DTranspose(128, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
 
     # 64, 128
-    x = keras.layers.Conv2DTranspose(64, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2DTranspose(64, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
 
     # 128, 256
-    x = keras.layers.Conv2DTranspose(32, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2DTranspose(32, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
 
     # 256, 512
-    x = keras.layers.Conv2DTranspose(3, kernel_size=4, strides=2, padding='same', activation='sigmoid')(x)
+    x = keras.layers.Conv2DTranspose(3, kernel_size=4, strides=2, padding='same', activation='sigmoid', kernel_initializer=weight_init)(x)
 
     return keras.models.Model([z, y], x, name='generator')
 
@@ -127,43 +127,43 @@ def make_discriminator_model(y_dim, weight_init, image_size):
     x = keras.layers.concatenate([im, y], axis=3)
 
     # 128, 256
-    x = keras.layers.Conv2D(32, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(32, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     # 64, 128
-    x = keras.layers.Conv2D(64, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(64, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     # 32, 64
-    x = keras.layers.Conv2D(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(128, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     # 16, 32
-    x = keras.layers.Conv2D(256, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(256, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     # 8, 16
-    x = keras.layers.Conv2D(512, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(512, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     # 4, 8
-    x = keras.layers.Conv2D(1024, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(1024, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     # 2, 4
-    x = keras.layers.Conv2D(2048, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(2048, kernel_size=4, strides=2, padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     x = keras.layers.Flatten()(x)
     x = keras.layers.Dropout(0.4)(x)
-    x = keras.layers.Dense(1)(x)
+    x = keras.layers.Dense(1, kernel_initializer=weight_init)(x)
 
     return keras.models.Model([im, y], x, name='discriminator')
 

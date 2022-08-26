@@ -26,7 +26,7 @@ class DCGAN:
     def __init__(self, config):
         self.num_epochs = int(config['num_epochs'])
 
-        self.batch_size = 64
+        self.batch_size = 128
         self.z_dim = 100
         self.learning_rate_gen = float(config['learning_rate_gen'])
         self.learning_rate_disc = float(config['learning_rate_disc'])
@@ -78,14 +78,14 @@ class DCGAN:
         np.savetxt(os.path.join(config['project_path'], 'labels.txt'), label_strings, fmt='%s')
 
         # make weight init
-        self.weight_init = tf.keras.initializers.TruncatedNormal(stddev=0.02, mean=0.0)
+        self.weight_init = tf.keras.initializers.RandomNormal(stddev=0.02, mean=0.0)
         # make cross entropy function
         # self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         # make augmenter
         self.augmenter = models.AdaptiveAugmenter()
         # make generator
-        self.generator = models.make_generator_model(self.num_labels, self.z_dim)
+        self.generator = models.make_generator_model(self.num_labels, self.z_dim, self.weight_init)
         # make discriminator
         self.discriminator = models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size)
 

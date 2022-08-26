@@ -83,9 +83,9 @@ class DCGAN:
         # make augmenter
         self.augmenter = models.AdaptiveAugmenter()
         # make generator
-        self.generator = models.make_generator_model(self.num_labels, self.z_dim, self.weight_init, self.bn_momentum, self.image_size, self.aspect, self.filters)
+        self.generator = models.make_generator_model(self.num_labels, self.z_dim)
         # make discriminator
-        self.discriminator = models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size, self.lr_slope, self.aspect, self.filters)
+        self.discriminator = models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size)
 
         # print summaries
         self.generator.summary()

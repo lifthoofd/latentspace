@@ -164,7 +164,7 @@ class DCGAN:
         expanded_labels = one_hot_labels * np.ones([M, img_size[0], img_size[1], num_labels], dtype=np.float32)
         return one_hot_labels, expanded_labels
 
-    @tf.functon
+    @tf.function
     def train_step(self, batch, step):
         real_images, real_labels = batch
         real_images = self.augmenter(real_images, training=True)

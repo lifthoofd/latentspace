@@ -46,7 +46,7 @@ class AdaptiveAugmenter(keras.Model):
             # during training either the original or the augmented images are selected
             # based on self.probability
             augmentation_values = tf.random.uniform(
-                shape=(128, 1, 1, 1), minval=0.0, maxval=1.0
+                shape=(64, 1, 1, 1), minval=0.0, maxval=1.0
             )
             augmentation_bools = tf.math.less(augmentation_values, self.probability)
 

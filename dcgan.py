@@ -24,7 +24,7 @@ class DCGAN:
     def __init__(self, config):
         self.num_epochs = int(config['num_epochs'])
 
-        self.batch_size = 128
+        self.batch_size = 64
         self.z_dim = 100
         self.learning_rate_gen = float(config['learning_rate_gen'])
         self.learning_rate_disc = float(config['learning_rate_disc'])
@@ -141,8 +141,8 @@ class DCGAN:
         return outputs
 
     def adverserial_loss(self, real_logits, generated_logits):
-        real_labels = tf.ones(shape=(128, 1))
-        generated_labels = tf.zeros(shape=(128, 1))
+        real_labels = tf.ones(shape=(self.batch_size, 1))
+        generated_labels = tf.zeros(shape=(self.batch_size, 1))
 
         generator_loss = keras.losses.binary_crossentropy(real_labels, generated_logits, from_logits=True)
 

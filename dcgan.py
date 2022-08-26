@@ -81,7 +81,7 @@ class DCGAN:
         # self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         # make augmenter
-        self.augmenter = models.AdaptiveAugmenter()
+        # self.augmenter = models.AdaptiveAugmenter()
         # make generator
         self.generator = models.make_generator_model(self.num_labels, self.z_dim)
         # make discriminator
@@ -169,13 +169,13 @@ class DCGAN:
 
     @tf.function
     def train_step(self, real_images, real_labels, y_real, y_real_expanded, generated_labels, y_fake, y_fake_expanded):
-        real_images = self.augmenter(real_images, training=True)
+        # real_images = self.augmenter(real_images, training=True)
 
         with tf.GradientTape(persistent=True) as tape:
             latent_samples = tf.random.normal((self.batch_size, 1, 1, self.z_dim))
 
             generated_images = self.generator([latent_samples, y_fake], training=True)
-            generated_images = self.augmenter(generated_images, training=True)
+            # generated_images = self.augmenter(generated_images, training=True)
 
             real_logits = self.discriminator([real_images, y_real_expanded], training=True)
             generated_logits = self.discriminator([generated_images, y_fake_expanded], training=True)
@@ -187,7 +187,7 @@ class DCGAN:
         self.generator_optimizer.apply_gradients(zip(generator_gradients, self.generator.trainable_weights))
         self.discriminator_optimizer.apply_gradients(zip(discriminator_gradients, self.discriminator.trainable_weights))
 
-        self.augmenter.update(real_logits)
+        # self.augmenter.update(real_logits)
 
         return gen_loss, disc_loss
 
@@ -197,7 +197,7 @@ class DCGAN:
         self.is_training = True
         gen_loss_mean = tf.keras.metrics.Mean(name='generator loss')
         disc_loss_mean = tf.keras.metrics.Mean(name='discriminator loss')
-        aug_prob_mean = tf.keras.metrics.Mean(name='augmenter probability')
+        # aug_prob_mean = tf.keras.metrics.Mean(name='augmenter probability')
 
         # start tensorboard
         tensorboard = subprocess.Popen(['tensorboard', '--logdir', self.summary_path, '--bind_all'])
@@ -225,25 +225,30 @@ class DCGAN:
                     self.losses['disc'] = float(disc_loss.numpy())
 
                     disc_loss_mean.update_state(disc_loss)
-                    aug_prob_mean.update_state(self.augmenter.probability)
+                    # aug_prob_mean.update_state(self.augmenter.probability)
 
                     if step % self.log_freq == 0:
                         # print(self.is_training)
-                        print('epoch {:04d} | step {:08d} | generator loss: {} | discriminator loss {} | augmenter prob: {}'.format(epoch, step,
-                                                                                                                                    gen_loss,
-                                                                                                                                    disc_loss,
-                                                                                                                                    self.augmenter.probability.numpy()))
+                        print('epoch {:04d} | step {:08d} | generator loss: {} | discriminator loss {}'.format(epoch, step,
+                                                                                                               gen_loss,
+                                                                                                               disc_loss))
+                        # print(
+                        #     'epoch {:04d} | step {:08d} | generator loss: {} | discriminator loss {} | augmenter prob: {}'.format(
+                        #         epoch, step,
+                        #         gen_loss,
+                        #         disc_loss,
+                        #         self.augmenter.probability.numpy()))
                     if step % SUMMARY_FREQ == 0:
                         with self.summary_writer.as_default():
                             if gen_loss is not None:
                                 tf.summary.scalar('generator loss', gen_loss_mean.result(), step=step)
                             tf.summary.scalar('discriminator loss', disc_loss_mean.result(), step=step)
-                            tf.summary.scalar('augmenter probability', aug_prob_mean.result(), step=step)
+                            # tf.summary.scalar('augmenter probability', aug_prob_mean.result(), step=step)
 
                         if gen_loss is not None:
                             gen_loss_mean.reset_states()
                         disc_loss_mean.reset_states()
-                        aug_prob_mean.reset_states()
+                        # aug_prob_mean.reset_states()
 
                         self.summary_writer.flush()
 

@@ -115,7 +115,7 @@ def make_generator_model(y_dim, z_dim):
     x = keras.layers.ReLU()(x)
 
     # 256, 512
-    x = keras.layers.Conv2DTranspose(3, (3, 3), kernel_size=4, strides=2, padding='same', activation='sigmoid')(x)
+    x = keras.layers.Conv2DTranspose(3, kernel_size=4, strides=2, padding='same', activation='sigmoid')(x)
 
     return keras.models.Model([z, y], x, name='generator')
 

@@ -74,10 +74,10 @@ def make_generator_model(y_dim, z_dim):
 
     start_size = (2, 4)
 
-    x = keras.layers.Dense(start_size[0] * start_size[1] * 128, use_bias=False)(gen_in)
+    x = keras.layers.Dense(start_size[0] * start_size[1] * 1024, use_bias=False)(gen_in)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
-    x = keras.layers.Reshape(target_shape=(start_size[0], start_size[1], 128))(x)
+    x = keras.layers.Reshape(target_shape=(start_size[0], start_size[1], 1024))(x)
 
     # # 2, 4
     # x = keras.layers.Conv2DTranspose(2048, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
@@ -85,17 +85,17 @@ def make_generator_model(y_dim, z_dim):
     # x = keras.layers.ReLU()(x)
 
     # 4, 8
-    x = keras.layers.Conv2DTranspose(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2DTranspose(1024, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
 
     # 8, 16
-    x = keras.layers.Conv2DTranspose(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2DTranspose(512, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
 
     # 16, 32
-    x = keras.layers.Conv2DTranspose(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2DTranspose(256, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
 
@@ -105,12 +105,12 @@ def make_generator_model(y_dim, z_dim):
     x = keras.layers.ReLU()(x)
 
     # 64, 128
-    x = keras.layers.Conv2DTranspose(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2DTranspose(64, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
 
     # 128, 256
-    x = keras.layers.Conv2DTranspose(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2DTranspose(32, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.ReLU()(x)
 
@@ -127,12 +127,12 @@ def make_discriminator_model(y_dim, weight_init, image_size):
     x = keras.layers.concatenate([im, y], axis=3)
 
     # 128, 256
-    x = keras.layers.Conv2D(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(32, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     # 64, 128
-    x = keras.layers.Conv2D(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(64, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
@@ -142,22 +142,22 @@ def make_discriminator_model(y_dim, weight_init, image_size):
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     # 16, 32
-    x = keras.layers.Conv2D(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(256, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     # 8, 16
-    x = keras.layers.Conv2D(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(512, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     # 4, 8
-    x = keras.layers.Conv2D(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(1024, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 
     # 2, 4
-    x = keras.layers.Conv2D(128, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
+    x = keras.layers.Conv2D(2048, kernel_size=4, strides=2, padding='same', use_bias=False)(x)
     x = keras.layers.BatchNormalization(scale=False)(x)
     x = keras.layers.LeakyReLU(alpha=0.2)(x)
 

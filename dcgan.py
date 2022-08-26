@@ -140,7 +140,7 @@ class DCGAN:
         outputs = tf.stack(op_list)
         return outputs
 
-    def adverserial_loss(self, real_logits, generated_logits, real_labels, generated_labels):
+    def adverserial_loss(self, real_logits, generated_logits):
         real_labels = tf.ones(shape=(128, 1))
         generated_labels = tf.zeros(shape=(128, 1))
 
@@ -180,7 +180,7 @@ class DCGAN:
             real_logits = self.discriminator([real_images, y_real_expanded], training=True)
             generated_logits = self.discriminator([generated_images, y_fake_expanded], training=True)
 
-            gen_loss, disc_loss = self.adverserial_loss(real_logits, generated_logits, real_labels, generated_labels)
+            gen_loss, disc_loss = self.adverserial_loss(real_logits, generated_logits)
 
         generator_gradients = tape.gradient(gen_loss, self.generator.trainable_weights)
         discriminator_gradients = tape.gradient(disc_loss, self.discriminator.trainable_weights)

@@ -10,12 +10,12 @@ from tensorflow.keras.optimizers import RMSprop, Adam
 from tensorflow.keras.initializers import he_normal
 from tensorflow.keras.constraints import max_norm
 
-from tensorflow.compat.v1 import ConfigProto
-from tensorflow.compat.v1 import InteractiveSession
-
-config = ConfigProto()
-config.gpu_options.allow_growth = True
-session = InteractiveSession(config=config)
+# from tensorflow.compat.v1 import ConfigProto
+# from tensorflow.compat.v1 import InteractiveSession
+#
+# config = ConfigProto()
+# config.gpu_options.allow_growth = True
+# session = InteractiveSession(config=config)
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -28,6 +28,21 @@ import time
 PATH = "/home/geert/Desktop/waterplant/"
 BUFFER_SIZE = 200
 IMAGE_RESOLUTION = 512
+
+
+def one_hot(labels, num_labels):
+    one_hot_labels = np.eye(num_labels, dtype=np.float32)[labels]
+    one_hot_labels = np.reshape(one_hot_labels, [-1, 1, 1, num_labels])
+    return one_hot_labels
+
+
+def expand_labels(labels, num_labels, img_size):
+    one_hot_labels = one_hot(labels, num_labels)
+    M = one_hot_labels.shape[0]
+    # img_size = self.image_size
+    expanded_labels = one_hot_labels * np.ones([M, img_size[0], img_size[1], num_labels], dtype=np.float32)
+    return one_hot_labels, expanded_labels
+
 
 def load(res, image_file):
     image = tf.io.read_file(image_file)
@@ -307,7 +322,6 @@ class ProgressiveGAN():
                      name=f'genblock_{res}_x_{res}') 
 
 
-        
     def build_discriminator_block(self, log2_res, input_shape):
 
         filter_n = self.log2_res_to_filter_size[log2_res]        

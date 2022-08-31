@@ -2,6 +2,7 @@ import os
 import sys
 import PySimpleGUI as sg
 import tensorflow as tf
+from tensorflow.keras.layers import Layer
 import argparse
 import json
 from sqlalchemy import create_engine, asc, desc
@@ -32,19 +33,152 @@ PLACEHOLDER_IM_PATH = os.path.join(BASE_PATH, 'placeholder.png')
 
 TIMELINE_INTERP_LINEAR = 'linear'
 TIMELINE_INTERP_CUBIC = 'cubic'
+TIMELINE_INTERP_SLERP = 'slerp'
 
 timeline_export_done = 0.0
+
+
+class PixelNorm(Layer):
+    def __init__(self, epsilon=1e-8, **kwargs):
+        super(PixelNorm, self).__init__()
+        self.epsilon = epsilon
+
+    def call(self, input_tensor):
+        return input_tensor / tf.math.sqrt(tf.reduce_mean(input_tensor ** 2, axis=-1, keepdims=True) + self.epsilon)
+
+    def get_config(self):
+        config = super().get_config().copy()
+
+        config.update({
+            'epsilon': self.epsilon
+        })
+
+        return config
+
+
+class MinibatchStd(Layer):
+    def __init__(self, group_size=4, epsilon=1e-8):
+        super(MinibatchStd, self).__init__()
+        self.epsilon = epsilon
+        self.group_size = group_size
+
+    def call(self, input_tensor):
+        n, h, w, c = input_tensor.shape
+        x = tf.reshape(input_tensor, [self.group_size, -1, h, w, c])
+        group_mean, group_var = tf.nn.moments(x, axes=(0), keepdims=False)
+        group_std = tf.sqrt(group_var + self.epsilon)
+        avg_std = tf.reduce_mean(group_std, axis=[1, 2, 3], keepdims=True)
+        x = tf.tile(avg_std, [self.group_size, h, w, 1])
+
+        return tf.concat([input_tensor, x], axis=-1)
+
+
+class Conv2D(Layer):
+    def __init__(self, out_channels, kernel=3, gain=2, **kwargs):
+        super(Conv2D, self).__init__(kwargs)
+        self.kernel = kernel
+        self.out_channels = out_channels
+        self.gain = gain
+        self.pad = kernel != 1
+
+    def build(self, input_shape):
+        self.in_channels = input_shape[-1]
+
+        initializer = tf.keras.initializers.RandomNormal(mean=0., stddev=1.)
+        self.w = self.add_weight(shape=[self.kernel,
+                                        self.kernel,
+                                        self.in_channels,
+                                        self.out_channels],
+                                 initializer=initializer,
+                                 trainable=True, name='kernel')
+
+        self.b = self.add_weight(shape=(self.out_channels,),
+                                 initializer='zeros',
+                                 trainable=True, name='bias')
+
+        fan_in = self.kernel * self.kernel * self.in_channels
+        self.scale = tf.sqrt(self.gain / fan_in)
+
+    def call(self, inputs):
+        if self.pad:
+            x = tf.pad(inputs, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='REFLECT')
+        else:
+            x = inputs
+        output = tf.nn.conv2d(x, self.scale * self.w, strides=1, padding="VALID") + self.b
+        return output
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'kernel': self.kernel,
+            'out_channels': self.out_channels,
+            'gain': self.gain,
+            'pad': self.pad
+        })
+        return config
+
+
+class Dense(Layer):
+    def __init__(self, units, gain=2, **kwargs):
+        super(Dense, self).__init__(kwargs)
+        self.units = units
+        self.gain = gain
+
+    def build(self, input_shape):
+        self.in_channels = input_shape[-1]
+        initializer = tf.keras.initializers.RandomNormal(mean=0., stddev=1.)
+        self.w = self.add_weight(shape=[self.in_channels,
+                                        self.units],
+                                 initializer=initializer,
+                                 trainable=True, name='kernel')
+
+        self.b = self.add_weight(shape=(self.units,),
+                                 initializer='zeros',
+                                 trainable=True, name='bias')
+
+        fan_in = self.in_channels
+        self.scale = tf.sqrt(self.gain / fan_in)
+
+    # @tf.function
+    def call(self, inputs):
+        output = tf.matmul(inputs, self.scale * self.w) + self.b
+        return output
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'units': self.units,
+            'gain': self.gain
+        })
+        return config
+
+
+class FadeIn(Layer):
+    @tf.function
+    def call(self, input_alpha, a, b, **kwargs):
+        alpha = tf.reduce_mean(input_alpha)
+        y = alpha * a + (1. - alpha) * b
+        return y
 
 
 class GAN:
     def __init__(self, project_path):
         model_path = os.path.join(project_path, 'generator.h5')
         label_path = os.path.join(project_path, 'labels.txt')
-        self.generator = tf.keras.models.load_model(model_path, compile=False)
-        print(self.generator.summary())
-        self.labels = np.loadtxt(label_path, dtype=str)
+        # print(self.generator.summary())
+        if os.path.isfile(label_path):
+            self.labels = np.loadtxt(label_path, dtype=str)
+        else:
+            self.labels = np.asarray([])
         self.num_labels = self.labels.shape[0]
         self.z_dim = 100
+
+        if self.num_labels != 0:
+            self.generator = tf.keras.models.load_model(model_path, compile=False)
+        else:
+            custom_objects = {'PixelNorm': PixelNorm, 'Conv2D': Conv2D, 'Dense': Dense, 'FadeIn': FadeIn}
+            self.generator = tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)
+        print(self.generator.summary())
 
     @staticmethod
     def one_hot(labels, num_labels):
@@ -54,7 +188,10 @@ class GAN:
 
     @tf.function
     def generate_samples(self, model, z, y):
-        return model([z, y], training=False)
+        if len(y) != 0:
+            return model([z, y], training=False)
+        else:
+            return model(z, training=False)
 
     def generate_image(self, z, y):
         image = self.generate_samples(self.generator, z, y)
@@ -92,7 +229,10 @@ def init_img_folder(gan, path, project, session):
             fn = gen_filename('.png')
             tf.io.write_file(os.path.join(path, fn), tf.image.encode_png(tf.cast(image, tf.uint8)))
             new_z = z[j].reshape(-1, 1, 1, gan.z_dim)
-            new_y = y[j].reshape(-1, 1, 1, gan.num_labels)
+            if gan.num_labels != 0:
+                new_y = y[j].reshape(-1, 1, 1, gan.num_labels)
+            else:
+                new_y = np.asarray([])
             im = Image(path=os.path.join(path, fn), z=pickle.dumps(new_z), y=pickle.dumps(new_y), project=project)
             #im = Image(path=os.path.join(path, fn), z=pickle.dumps(z[j]), y=pickle.dumps(y[j]), project=project)
             session.add(im)
@@ -175,7 +315,10 @@ def create_children(session, gan, im_id, data):
         z = np.array(pickle.loads(origin_im.z)).astype('float32')
         y = np.array(data[0]).astype('float32')
         z = z.reshape((1, 1, 1, gan.z_dim))
-        y = y.reshape((1, 1, 1, gan.num_labels))
+        if gan.num_labels != 0:
+            y = y.reshape((1, 1, 1, gan.num_labels))
+        else:
+            y = np.asarray([])
 
         rand = data[1]
         amount = int(data[2])
@@ -249,6 +392,28 @@ def update_timeline(window, timelines, offset, conf):
         window[('-TIMELINE_ORDER-', i)].update(value=str(tls[i].order))
 
 
+def slerp_interp(points, step_count):
+    def slerp(val, low, high):
+        low = low.reshape(-1)
+        high = high.reshape(-1)
+        omega = np.arccos(np.clip(np.dot(low / np.linalg.norm(low), high / np.linalg.norm(high)), -1, 1))
+        so = np.sin(omega)
+        if so == 0:
+            # L'Hopital's rule/LERP
+            return (1.0 - val) * low + val * high
+        return np.sin((1.0 - val) * omega) / so * low + np.sin(val * omega) / so * high
+
+    steps = int(step_count / (len(points) - 1))
+    vectors = list()
+    for i in range(len(points) - 2):
+        ratios = np.linspace(0., 1., num=steps)
+        for ratio in ratios:
+            v = slerp(ratio, points[i], points[i+1])
+            v = v.reshape((1, 1, 1, -1))
+            vectors.append(v)
+    return np.asarray(vectors)
+
+
 def interp(points, step_count, method):
     def lin_interp1d(y):
         x = np.linspace(0., 1., len(y))
@@ -269,6 +434,8 @@ def interp(points, step_count, method):
         return np.apply_along_axis(lin_interp1d, 0, points)
     elif method == 'cubic':
         return np.apply_along_axis(cubic_spline_interp1d, 0, points)
+    elif method == 'slerp':
+        return slerp_interp(points, step_count)
     else:
         raise ValueError('Interpolation method does not exist: {}'.format(method))
 
@@ -305,7 +472,10 @@ def export_timeline(gan, ims, frames, loop, interp_method, path, window):
     for i in range(z_seq.shape[0]):
         # print(f'generating frame {i}')
         z = z_seq[i].reshape(-1, 1, 1, gan.z_dim)
-        y = y_seq[i].reshape(-1, 1, 1, gan.num_labels)
+        if gan.num_labels != 0:
+            y = y_seq[i].reshape(-1, 1, 1, gan.num_labels)
+        else:
+            y = np.asarray([])
         gen_im = gan.generate_image(z, y)
         gen_im = gen_im * 127.5 + 127.5
         gen_im = np.uint8(gen_im)
@@ -373,7 +543,9 @@ def make_window2(session, project, im_page, size):
                          sg.Button('Update Order', key='-UPDATE_ORDER-', enable_events=True),
                          sg.Button('Next', key='-NEXT_TIMELINE-', enable_events=True)]
 
-    timeline_controls = [[sg.Text('Interpolation:'), sg.Combo(['linear', 'cubic'], default_value='cubic', key='-TIMELINE_INTERP-', enable_events=True)],
+    timeline_controls = [[sg.Text('Interpolation:'), sg.Combo([TIMELINE_INTERP_LINEAR,
+                                                               TIMELINE_INTERP_CUBIC,
+                                                               TIMELINE_INTERP_SLERP], default_value=TIMELINE_INTERP_LINEAR, key='-TIMELINE_INTERP-', enable_events=True)],
                          [sg.Text('Frames:'), sg.InputText(default_text='1000', key='-TIME_LINE_FRAMES-', enable_events=True)],
                          [sg.Text('Loop:'), sg.Checkbox('', default=True, key='-TIMELINE_LOOP-', enable_events=True)],
                          [sg.Text('Folder: '), sg.In(size=(50, 1), enable_events=True, key='-TIMELINE_EXPORT_PATH-'), sg.FolderBrowse()],
@@ -574,6 +746,7 @@ def main():
             if event == '-TIMELINE_EXPORT-':
                 # print(export_path)
                 if export_path != "":
+                    print(timeline_interp)
                     worker = threading.Thread(target=export_timeline, args=(gan, [tl.image for tl in timelines], timeline_frames, timeline_loop, timeline_interp, export_path, window))
                     worker.start()
 

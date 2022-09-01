@@ -244,6 +244,13 @@ class ProgressiveGAN():
         self.model = Model(inputs=self.generator.input, outputs=pred)
         self.model.compile(loss=wasserstein_loss, optimizer=Adam(**self.opt_init))
         self.ckpt_path = os.path.join(self.project_path, 'ckpts')
+        self.samples_path = os.path.join(self.project_path, 'samples')
+
+        if not os.path.isdir(self.ckpt_path):
+            os.makedirs(self.ckpt_path)
+
+        if not os.path.isdir(self.samples_path):
+            os.makedirs(self.samples_path)
 
     def build_all_generators(self):
         # build all the generator block
@@ -499,10 +506,8 @@ class ProgressiveGAN():
             self.discriminator_blocks[i].save(f'{path}/d_{i}')
             self.generator_blocks[i].save(f'{path}/g_{i}')
         
-        # self.generator.save(os.path.join(path, 'generator.h5'))
-        
         images = self.generate(z)
-        plot_images(images, log2_res, os.path.join(self.project_path, f'samples/{prefix}.jpg'))
+        plot_images(images, log2_res, os.path.join(self.samples_path, f'/{prefix}.jpg'))
         
     def load_checkpoint(self, path):
         max_log2res = int(max([os.path.basename(d).split('_')[-1] for d in glob(path+'/d_*')]))

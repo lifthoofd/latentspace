@@ -507,7 +507,7 @@ class ProgressiveGAN():
             self.generator_blocks[i].save(f'{path}/g_{i}')
         
         images = self.generate(z)
-        plot_images(images, log2_res, os.path.join(self.samples_path, f'/{prefix}.jpg'))
+        plot_images(images, log2_res, os.path.join(self.samples_path, f'{prefix}.jpg'))
         
     def load_checkpoint(self, path):
         max_log2res = int(max([os.path.basename(d).split('_')[-1] for d in glob(path+'/d_*')]))

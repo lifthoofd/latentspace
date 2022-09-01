@@ -1,3 +1,4 @@
+import os
 import argparse
 import tensorflow as tf
 from tensorflow.keras import Model
@@ -193,7 +194,8 @@ class Dense(Layer):
         
         
 class ProgressiveGAN():
-    def __init__(self, z_dim=512, resolution=512, start_log2_res=2):
+    def __init__(self, project_path, z_dim=512, resolution=512, start_log2_res=2):
+        self.project_path = project_path
         self.start_log2_res = start_log2_res
         self.resolution = resolution
         self.log2_resolution = int(np.log2(resolution))
@@ -241,7 +243,7 @@ class ProgressiveGAN():
 
         self.model = Model(inputs=self.generator.input, outputs=pred)
         self.model.compile(loss=wasserstein_loss, optimizer=Adam(**self.opt_init))
-        self.ckpt_path = f"./checkpoints/stylegan/"
+        self.ckpt_path = os.path.join(self.project_path, 'ckpts')
 
     def build_all_generators(self):
         # build all the generator block
@@ -500,7 +502,7 @@ class ProgressiveGAN():
         self.generator.save(os.path.join(path, 'generator.h5'))
         
         images = self.generate(z)
-        plot_images(images, log2_res, f"./save_images/{prefix}.jpg")
+        plot_images(images, log2_res, os.path.join(self.project_path, f'samples/{prefix}.jpg'))
         
     def load_checkpoint(self, path):
         max_log2res = int(max([os.path.basename(d).split('_')[-1] for d in glob(path+'/d_*')]))
@@ -573,12 +575,15 @@ def load(res, image_file):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='LatentSpace ProGAN')
     parser.add_argument('-d', '--dataset_path', type=str, help='path to dataset')
-    parser.add_argument('-s', 'steps_per_phase', type=int, default=20000, help='total steps per size phase')
-    parser.add_argument('-t', '--tick_interval', type=int, default=4000, help='steps per tick in size phase')
-    parser.add_argument('-x', '--target_x', type=int, default=512, help='target x resolution')
+    parser.add_argument('-p', '--project_path', type=str, help='project path')
+    parser.add_argument('-s', 'steps_per_phase', type=int, default=20000, help='total steps per size phase, default = 20000')
+    parser.add_argument('-t', '--tick_interval', type=int, default=4000, help='steps per tick in size phase, default = 4000')
+    parser.add_argument('-x', '--target_x', type=int, default=512, help='target x resolution, default = 512')
+
+    args = parser.parse_args()
 
     train_datasets = {}
-    train_images = glob(PATH+'*.png')
+    train_images = glob(os.path.join(args.dataset_path, '*.png'))
     random.shuffle(train_images)
     train_dataset_list = tf.data.Dataset.from_tensor_slices(train_images)
     n_workers = tf.data.experimental.AUTOTUNE
@@ -590,8 +595,11 @@ if __name__ == '__main__':
         temp = temp.shuffle(BUFFER_SIZE).batch(BATCH_SIZE[log2_res], drop_remainder=True).repeat()
         train_datasets[log2_res] = temp
 
-    gan = ProgressiveGAN(resolution=IMAGE_RESOLUTION)
-    gan.train(train_datasets, 20000, 4000)
+    if not os.path.isdir(args.project_path):
+        os.makedirs(args.project_path)
+
+    gan = ProgressiveGAN(args.project_path, resolution=args.target_x)
+    gan.train(train_datasets, args.steps_per_phase, args.tick_interval)
 
 
 

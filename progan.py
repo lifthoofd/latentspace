@@ -571,7 +571,7 @@ class ProgressiveGAN():
 def load(res, image_file):
     image = tf.io.read_file(image_file)
     image = tf.image.decode_jpeg(image)
-    image = tf.image.resize(image, [res, res // 2], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    image = tf.image.resize(image, [res // 2, res], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
     image = tf.cast(image, tf.float32)
     image = (image / 127.5) - 1
     return image

@@ -227,12 +227,12 @@ class ProgressiveGAN():
         self.generator = Model([self.generator_blocks[2].input, dummy_alpha], rgb)
 
         # build base discriminator
-        input_image = Input(shape=(4,2,3))
+        input_image = Input(shape=(2,4,3))
         alpha = Input(shape=(1))           
         x = self.from_rgb[2](input_image)  
         pred = self.discriminator_blocks[2](x)
 
-        self.discriminator = Model([input_image, alpha], pred, name='discriminator_4x4')
+        self.discriminator = Model([input_image, alpha], pred, name='discriminator_2x4')
 
         self.optimizer_discriminator = Adam(**self.opt_init)                
 
@@ -276,11 +276,11 @@ class ProgressiveGAN():
         input_tensor = Input(shape=input_shape, name='gen_base')
         x = PixelNorm()(input_tensor)
         x = Dense(4096, gain=1./8)(x)
-        x = Reshape((4, 2, 512))(x)
+        x = Reshape((2, 4, 512))(x)
         x = LeakyReLU(0.2)(x)
         x = PixelNorm()(x)
         
-        x = Conv2D(512, 3, name='gen_4x4_conv1')(x)
+        x = Conv2D(512, 3, name='gen_2x4_conv1')(x)
         x = LeakyReLU(0.2)(x)
         x = PixelNorm()(x)
         
@@ -288,7 +288,7 @@ class ProgressiveGAN():
 
     def build_generator_block(self, log2_res, input_shape):
         res = 2**log2_res
-        res_name = f'{res}x{res//2}'
+        res_name = f'{res // 2}x{res}'
         filter_n = self.log2_res_to_filter_size[log2_res]
         
         input_tensor = Input(shape=input_shape, name=f'gen_{res_name}_input')
@@ -302,7 +302,7 @@ class ProgressiveGAN():
         x = LeakyReLU(0.2)(x)
         x = PixelNorm()(x)      
         
-        return Model(input_tensor, x, name=f'genblock_{res}_x_{res//2}')
+        return Model(input_tensor, x, name=f'genblock_{res // 2}_x_{res}')
 
     def build_discriminator_block(self, log2_res, input_shape):
 
@@ -320,7 +320,7 @@ class ProgressiveGAN():
         x = AveragePooling2D((2,2))(x)
         
         res = 2**log2_res
-        return Model(input_tensor, x, name=f'disc_block_{res}_x_{res}')
+        return Model(input_tensor, x, name=f'disc_block_{res // 2}_x_{res}')
 
     def build_discriminator_base(self, input_shape):
 
@@ -328,27 +328,27 @@ class ProgressiveGAN():
 
         x = MinibatchStd()(input_tensor)
         #x = input_tensor
-        x = Conv2D(512, 3, name='gen_4x4_conv1')(x)
+        x = Conv2D(512, 3, name='gen_2x4_conv1')(x)
         x = LeakyReLU(0.2)(x)
         x = Flatten()(x)
         
-        x = Dense(512, name='gen_4x4_dense1')(x)
+        x = Dense(512, name='gen_2x4_dense1')(x)
         x = LeakyReLU(0.2)(x)
 
-        x = Dense(1, name='gen_4x4_dense2')(x)
+        x = Dense(1, name='gen_2x4_dense2')(x)
         
         return Model(input_tensor, x, name='discriminator_base')
 
     def build_to_rgb(self, res, filter_n):
         
-        return Sequential([Input(shape=(res, res//2, filter_n), name=f'to_rgb_{res}x{res//2}_input'),
-                           Conv2D(3, 1, gain=1, activation=None, name=f'to_rgb_{res}x{res//2}_conv')], name=f'to_rgb_{res}x{res//2}')
+        return Sequential([Input(shape=(res // 2, res, filter_n), name=f'to_rgb_{res // 2}x{res}_input'),
+                           Conv2D(3, 1, gain=1, activation=None, name=f'to_rgb_{res // 2}x{res}_conv')], name=f'to_rgb_{res // 2}x{res}')
     
     def build_from_rgb(self, res, filter_n):
         
-        return Sequential([Input(shape=(res, res//2, 3), name=f'from_rgb_{res}x{res//2}_input'),
-                           Conv2D(filter_n, 1, name=f'from_rgb_{res}x{res//2}_conv'),
-                           LeakyReLU(0.2)], name=f'from_rgb_{res}x{res//2}')
+        return Sequential([Input(shape=(res // 2, res, 3), name=f'from_rgb_{res // 2}x{res}_input'),
+                           Conv2D(filter_n, 1, name=f'from_rgb_{res // 2}x{res}_conv'),
+                           LeakyReLU(0.2)], name=f'from_rgb_{res // 2}x{res}')
     
     def build_all_discriminators(self):
         self.from_rgb = {}
@@ -360,23 +360,23 @@ class ProgressiveGAN():
             filter_n = self.log2_res_to_filter_size[log2_res]            
             self.from_rgb[log2_res] = self.build_from_rgb(res, filter_n)
             
-            input_shape = (res, res//2, filter_n)
+            input_shape = (res // 2, res, filter_n)
             self.discriminator_blocks[log2_res] = self.build_discriminator_block(log2_res, input_shape)
             self.discriminator_blocks[log2_res].summary()
 
-        # last block at 4x4 resolution
+        # last block at 2x4 resolution
         log2_res = 2
         filter_n = self.log2_res_to_filter_size[log2_res]            
         self.from_rgb[log2_res] = self.build_from_rgb(4, filter_n)
         res = 2**log2_res
-        input_shape = (res, res//2, filter_n)
+        input_shape = (res // 2, res, filter_n)
         self.discriminator_blocks[log2_res] = self.build_discriminator_base(input_shape)
         self.discriminator_blocks[log2_res].summary()
 
     def grow_discriminator(self, log2_res):
         res = 2**log2_res 
 
-        input_image = Input(shape=(res, res//2, 3))
+        input_image = Input(shape=(res // 2, res, 3))
         alpha = Input(shape=(1))
         
         x = self.from_rgb[log2_res](input_image)
@@ -389,7 +389,7 @@ class ProgressiveGAN():
         for i in range (log2_res-1, 1, -1):
             x = self.discriminator_blocks[i](x)
             
-        self.discriminator =  Model([input_image, alpha], x, name=f'discriminator_{res}_x_{res//2}')
+        self.discriminator =  Model([input_image, alpha], x, name=f'discriminator_{res // 2}_x_{res}')
         
         self.optimizer_discriminator = Adam(**self.opt_init)        
                 
@@ -408,12 +408,12 @@ class ProgressiveGAN():
         x = self.generator_blocks[log2_res](x)
         new_rgb = self.to_rgb[log2_res](x)
         rgb = FadeIn()(alpha, new_rgb, old_rgb)
-        self.generator = Model([self.generator_blocks[2].input, alpha], rgb, name=f'generator_{res}_x_{res//2}')
+        self.generator = Model([self.generator_blocks[2].input, alpha], rgb, name=f'generator_{res // 2}_x_{res}')
                          
     def grow_model(self, log2_res):
         tf.keras.backend.clear_session()
         res = 2**log2_res
-        print(f"Growing model to {res}x{res//2}")
+        print(f"Growing model to {res // 2}x{res}")
             
         self.grow_generator(log2_res)
         self.grow_discriminator(log2_res)
@@ -557,7 +557,7 @@ class ProgressiveGAN():
                         minutes = int(elapsed // 60)
                         seconds = int(elapsed % 60)
                         print(f"elapsed {minutes} min {seconds} sec")
-                        msg = f"{state}. Resolution {res}x{res} Step {step}: g_loss {self.g_loss:.4f} d_loss {self.d_loss:.4f}"
+                        msg = f"{state}. Resolution {res}x{res // 2} Step {step}: g_loss {self.g_loss:.4f} d_loss {self.d_loss:.4f}"
                         print(msg)
 
                         self.checkpoint(self.val_z, log2_res, step)

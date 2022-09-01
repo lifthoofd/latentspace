@@ -499,7 +499,7 @@ class ProgressiveGAN():
             self.discriminator_blocks[i].save(f'{path}/d_{i}')
             self.generator_blocks[i].save(f'{path}/g_{i}')
         
-        self.generator.save(os.path.join(path, 'generator.h5'))
+        # self.generator.save(os.path.join(path, 'generator.h5'))
         
         images = self.generate(z)
         plot_images(images, log2_res, os.path.join(self.project_path, f'samples/{prefix}.jpg'))
@@ -576,7 +576,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='LatentSpace ProGAN')
     parser.add_argument('-d', '--dataset_path', type=str, help='path to dataset')
     parser.add_argument('-p', '--project_path', type=str, help='project path')
-    parser.add_argument('-s', 'steps_per_phase', type=int, default=20000, help='total steps per size phase, default = 20000')
+    parser.add_argument('-s', '--steps_per_phase', type=int, default=20000, help='total steps per size phase, default = 20000')
     parser.add_argument('-t', '--tick_interval', type=int, default=4000, help='steps per tick in size phase, default = 4000')
     parser.add_argument('-x', '--target_x', type=int, default=512, help='target x resolution, default = 512')
 

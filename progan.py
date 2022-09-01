@@ -227,7 +227,7 @@ class ProgressiveGAN():
         self.generator = Model([self.generator_blocks[2].input, dummy_alpha], rgb)
 
         # build base discriminator
-        input_image = Input(shape=(4,4,3))
+        input_image = Input(shape=(4,2,3))
         alpha = Input(shape=(1))           
         x = self.from_rgb[2](input_image)  
         pred = self.discriminator_blocks[2](x)

@@ -268,7 +268,7 @@ class ProgressiveGAN():
     def build_generator_base(self, input_shape):
         input_tensor = Input(shape=input_shape, name='gen_base')
         x = PixelNorm()(input_tensor)
-        x = Dense(8192, gain=1./8)(x)
+        x = Dense(4096, gain=1./8)(x)
         x = Reshape((4, 2, 512))(x)
         x = LeakyReLU(0.2)(x)
         x = PixelNorm()(x)

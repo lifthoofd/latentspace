@@ -195,6 +195,7 @@ class Dense(Layer):
         
 class ProgressiveGAN():
     def __init__(self, project_path, z_dim=512, resolution=512, start_log2_res=2):
+        self.num_labels = 0
         self.project_path = project_path
         self.start_log2_res = start_log2_res
         self.resolution = resolution
@@ -489,7 +490,7 @@ class ProgressiveGAN():
         return images.astype(np.uint8)
 
     def generate_samples(self, z):
-        images = self.generator([z, [[0.2]]])
+        images = self.generator([z, [[1.0]]])
         images = np.clip((images * 0.5 + 0.5) * 255, 0, 255)
         return images.astype(np.uint8)
 

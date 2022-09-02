@@ -19,6 +19,11 @@ from scipy import interpolate
 import threading
 
 from db_declare import Base, Project, Image, Timeline, Child
+from progan import ProgressiveGAN
+
+GAN_TYPE_NONE = -1
+GAN_TYPE_WGAN = 0
+GAN_TYPE_PROGAN = 1
 
 WINDOW_BIG = {'size': (2500, 1300), 'sample': 2}
 WINDOW_SMALL = {'size': (1200, 1000), 'sample': 4}
@@ -38,146 +43,18 @@ TIMELINE_INTERP_SLERP = 'slerp'
 timeline_export_done = 0.0
 
 
-class PixelNorm(Layer):
-    def __init__(self, epsilon=1e-8, **kwargs):
-        super(PixelNorm, self).__init__()
-        self.epsilon = epsilon
-
-    def call(self, input_tensor):
-        return input_tensor / tf.math.sqrt(tf.reduce_mean(input_tensor ** 2, axis=-1, keepdims=True) + self.epsilon)
-
-    def get_config(self):
-        config = super().get_config().copy()
-
-        config.update({
-            'epsilon': self.epsilon
-        })
-
-        return config
-
-
-class MinibatchStd(Layer):
-    def __init__(self, group_size=4, epsilon=1e-8):
-        super(MinibatchStd, self).__init__()
-        self.epsilon = epsilon
-        self.group_size = group_size
-
-    def call(self, input_tensor):
-        n, h, w, c = input_tensor.shape
-        x = tf.reshape(input_tensor, [self.group_size, -1, h, w, c])
-        group_mean, group_var = tf.nn.moments(x, axes=(0), keepdims=False)
-        group_std = tf.sqrt(group_var + self.epsilon)
-        avg_std = tf.reduce_mean(group_std, axis=[1, 2, 3], keepdims=True)
-        x = tf.tile(avg_std, [self.group_size, h, w, 1])
-
-        return tf.concat([input_tensor, x], axis=-1)
-
-
-class Conv2D(Layer):
-    def __init__(self, out_channels, kernel=3, gain=2, **kwargs):
-        super(Conv2D, self).__init__(kwargs)
-        self.kernel = kernel
-        self.out_channels = out_channels
-        self.gain = gain
-        self.pad = kernel != 1
-
-    def build(self, input_shape):
-        self.in_channels = input_shape[-1]
-
-        initializer = tf.keras.initializers.RandomNormal(mean=0., stddev=1.)
-        self.w = self.add_weight(shape=[self.kernel,
-                                        self.kernel,
-                                        self.in_channels,
-                                        self.out_channels],
-                                 initializer=initializer,
-                                 trainable=True, name='kernel')
-
-        self.b = self.add_weight(shape=(self.out_channels,),
-                                 initializer='zeros',
-                                 trainable=True, name='bias')
-
-        fan_in = self.kernel * self.kernel * self.in_channels
-        self.scale = tf.sqrt(self.gain / fan_in)
-
-    def call(self, inputs):
-        if self.pad:
-            x = tf.pad(inputs, [[0, 0], [1, 1], [1, 1], [0, 0]], mode='REFLECT')
-        else:
-            x = inputs
-        output = tf.nn.conv2d(x, self.scale * self.w, strides=1, padding="VALID") + self.b
-        return output
-
-    def get_config(self):
-        config = super().get_config().copy()
-        config.update({
-            'kernel': self.kernel,
-            'out_channels': self.out_channels,
-            'gain': self.gain,
-            'pad': self.pad
-        })
-        return config
-
-
-class Dense(Layer):
-    def __init__(self, units, gain=2, **kwargs):
-        super(Dense, self).__init__(kwargs)
-        self.units = units
-        self.gain = gain
-
-    def build(self, input_shape):
-        self.in_channels = input_shape[-1]
-        initializer = tf.keras.initializers.RandomNormal(mean=0., stddev=1.)
-        self.w = self.add_weight(shape=[self.in_channels,
-                                        self.units],
-                                 initializer=initializer,
-                                 trainable=True, name='kernel')
-
-        self.b = self.add_weight(shape=(self.units,),
-                                 initializer='zeros',
-                                 trainable=True, name='bias')
-
-        fan_in = self.in_channels
-        self.scale = tf.sqrt(self.gain / fan_in)
-
-    # @tf.function
-    def call(self, inputs):
-        output = tf.matmul(inputs, self.scale * self.w) + self.b
-        return output
-
-    def get_config(self):
-        config = super().get_config().copy()
-        config.update({
-            'units': self.units,
-            'gain': self.gain
-        })
-        return config
-
-
-class FadeIn(Layer):
-    @tf.function
-    def call(self, input_alpha, a, b, **kwargs):
-        alpha = tf.reduce_mean(input_alpha)
-        y = alpha * a + (1. - alpha) * b
-        return y
-
-
 class GAN:
     def __init__(self, project_path):
         model_path = os.path.join(project_path, 'generator.h5')
         label_path = os.path.join(project_path, 'labels.txt')
-        # print(self.generator.summary())
-        if os.path.isfile(label_path):
-            self.labels = np.loadtxt(label_path, dtype=str)
-        else:
-            self.labels = np.asarray([])
+
+        self.labels = np.loadtxt(label_path, dtype=str)
+
         self.num_labels = self.labels.shape[0]
         self.z_dim = 100
 
-        if self.num_labels != 0:
-            self.generator = tf.keras.models.load_model(model_path, compile=False)
-        else:
-            custom_objects = {'PixelNorm': PixelNorm, 'Conv2D': Conv2D, 'Dense': Dense, 'FadeIn': FadeIn}
-            self.generator = tf.keras.models.load_model(model_path, compile=False, custom_objects=custom_objects)
+        self.generator = tf.keras.models.load_model(model_path, compile=False)
+
         print(self.generator.summary())
 
     @staticmethod
@@ -188,10 +65,7 @@ class GAN:
 
     @tf.function
     def generate_samples(self, model, z, y):
-        if len(y) != 0:
-            return model([z, y], training=False)
-        else:
-            return model(z, training=False)
+        return model([z, y], training=False)
 
     def generate_image(self, z, y):
         image = self.generate_samples(self.generator, z, y)
@@ -212,29 +86,31 @@ def init_img_folder(gan, path, project, session):
     else:
         shutil.rmtree(path)
         os.makedirs(path)
+    if type(gan) == GAN:
+        for i in range(gan.num_labels):
+            z = np.random.normal(size=[10, 1, 1, gan.z_dim]).astype('float32')
+            labels = [i] * 10
+            y = gan.one_hot(labels, gan.num_labels)
 
-    for i in range(gan.num_labels):
-        z = np.random.normal(size=[10, 1, 1, gan.z_dim]).astype('float32')
-        #z = tf.random.normal([10, 1, 1, gan.z_dim])
-        labels = [i] * 10
-        y = gan.one_hot(labels, gan.num_labels)
-        
-        # print(z.shape)
-        # print(y.shape)
+            images = gan.generate_image(z, y)
 
-        images = gan.generate_image(z, y)
-
-        for j, image in enumerate(images):
-            image = image * 127.5 + 127.5
+            for j, image in enumerate(images):
+                image = image * 127.5 + 127.5
+                fn = gen_filename('.png')
+                tf.io.write_file(os.path.join(path, fn), tf.image.encode_png(tf.cast(image, tf.uint8)))
+                new_z = z[j].reshape(-1, 1, 1, gan.z_dim)
+                new_y = y[j].reshape(-1, 1, 1, gan.num_labels)
+                im = Image(path=os.path.join(path, fn), z=pickle.dumps(new_z), y=pickle.dumps(new_y), project=project)
+                session.add(im)
+                session.commit()
+    elif type(gan) == ProgressiveGAN:
+        z = np.random.normal(size=[40, gan.z_dim]).astype('float32')
+        images = gan.generate_samples(z)
+        for i, image in enumerate(images):
             fn = gen_filename('.png')
             tf.io.write_file(os.path.join(path, fn), tf.image.encode_png(tf.cast(image, tf.uint8)))
-            new_z = z[j].reshape(-1, 1, 1, gan.z_dim)
-            if gan.num_labels != 0:
-                new_y = y[j].reshape(-1, 1, 1, gan.num_labels)
-            else:
-                new_y = np.asarray([])
-            im = Image(path=os.path.join(path, fn), z=pickle.dumps(new_z), y=pickle.dumps(new_y), project=project)
-            #im = Image(path=os.path.join(path, fn), z=pickle.dumps(z[j]), y=pickle.dumps(y[j]), project=project)
+            new_z = z[i].reshape(-1, gan.z_dim)
+            im = Image(path=os.path.join(path, fn), z=pickle.dumps(new_z), y=pickle.dumps(np.asarray([])), project=project)
             session.add(im)
             session.commit()
 
@@ -276,15 +152,16 @@ def update_image_page(session, project, page, window, size, conf):
         return False
 
 
-def update_sel_image_browser(session, project, page, data, window, size, control_data):
+def update_sel_image_browser(session, project, page, data, window, size, control_data, gan):
     offset = page * (size[0] * size[1])
     im = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (data[0] * size[1])).limit(size[1]).all()[data[1]]
     window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256))
 
-    y = pickle.loads(im.y)
-    for i in range(len(y[0][0][0])):
-        window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][0][i])
-        control_data[0][0][0][i] = y[0][0][0][i]
+    if type(gan) == GAN:
+        y = pickle.loads(im.y)
+        for i in range(len(y[0][0][0])):
+            window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][0][i])
+            control_data[0][0][0][i] = y[0][0][0][i]
 
     return im.id
     
@@ -315,10 +192,7 @@ def create_children(session, gan, im_id, data):
         z = np.array(pickle.loads(origin_im.z)).astype('float32')
         y = np.array(data[0]).astype('float32')
         z = z.reshape((1, 1, 1, gan.z_dim))
-        if gan.num_labels != 0:
-            y = y.reshape((1, 1, 1, gan.num_labels))
-        else:
-            y = np.asarray([])
+        y = y.reshape((1, 1, 1, gan.num_labels))
 
         rand = data[1]
         amount = int(data[2])
@@ -345,9 +219,16 @@ def show_children(session, gan, window, conf):
         child = children[i]
         x = i % IM_CHILDREN_SIZE[0]
         y = i // IM_CHILDREN_SIZE[0]
-        
-        image = gan.generate_image(z=pickle.loads(child.z), y=pickle.loads(child.y))
-        image = image * 127.5 + 127.5
+
+        if type(gan) == GAN:
+            image = gan.generate_image(z=pickle.loads(child.z), y=pickle.loads(child.y))
+            image = image * 127.5 + 127.5
+        elif type(gan) == ProgressiveGAN:
+            z = pickle.loads(child.z).reshape(-1, gan.z_dim)
+            image = gan.generate_samples(z=z)
+        else:
+            image = None
+
         image = image.astype(np.uint8)
         image = pi.fromarray(image[0])
         with BytesIO() as output_bytes:
@@ -364,8 +245,14 @@ def save_image(session, gan, project, data, path):
     index = data[1] * IM_CHILDREN_SIZE[0] + data[0]
     child = session.query(Child).order_by(asc(Child.id)).all()[index]
     # print(pickle.loads(child.z))
-    image = gan.generate_image(z=pickle.loads(child.z), y=pickle.loads(child.y))
-    image = image * 127.5 + 127.5
+    if type(gan) == GAN:
+        image = gan.generate_image(z=pickle.loads(child.z), y=pickle.loads(child.y))
+        image = image * 127.5 + 127.5
+    elif type(gan) == ProgressiveGAN:
+        image = gan.generate_samples(z=pickle.loads(child.z).reshape(-1, gan.z_dim))
+    else:
+        image = None
+
     fn = gen_filename('.png')
     tf.io.write_file(os.path.join(path, fn), tf.image.encode_png(tf.cast(image[0], tf.uint8)))
     im = Image(path=os.path.join(path, fn), z=child.z, y=child.y, project=project)
@@ -459,7 +346,10 @@ def export_timeline(gan, ims, frames, loop, interp_method, path, window):
     y_keys = np.asarray(y_keys)
 
     z_seq = interp(z_keys, frames, interp_method)
-    y_seq = interp(y_keys, frames, interp_method)
+    if type(gan) == GAN:
+        y_seq = interp(y_keys, frames, interp_method)
+    else:
+        y_seq = np.asarray([])
 
     if not os.path.isdir(path):
         os.makedirs(path)
@@ -472,12 +362,16 @@ def export_timeline(gan, ims, frames, loop, interp_method, path, window):
     for i in range(z_seq.shape[0]):
         # print(f'generating frame {i}')
         z = z_seq[i].reshape(-1, 1, 1, gan.z_dim)
-        if gan.num_labels != 0:
+
+        if type(gan) == GAN:
             y = y_seq[i].reshape(-1, 1, 1, gan.num_labels)
+            gen_im = gan.generate_image(z, y)
+            gen_im = gen_im * 127.5 + 127.5
+        elif type(gan) == ProgressiveGAN:
+            gen_im = gan.generate_samples(z.reshape(-1, gan.z_dim))
         else:
-            y = np.asarray([])
-        gen_im = gan.generate_image(z, y)
-        gen_im = gen_im * 127.5 + 127.5
+            gen_im = None
+
         gen_im = np.uint8(gen_im)
         # gen_ims.append(gen_im)
         file_path = os.path.join(path, f'{i:09d}.png')
@@ -492,16 +386,17 @@ def export_timeline(gan, ims, frames, loop, interp_method, path, window):
 def make_window1(session, project, gan, im_page, size):
     img_browser_row = get_image_page(session, project, im_page, IM_GALLERY_SIZE_BROWSER, size)
     img_control = []
-    label_strings = gan.get_label_strings()
-    for i in range(gan.num_labels):
-        cntrl = [sg.Text(label_strings[i]), sg.Slider(range=(-1.0, 1.0), resolution=0.0001,
-                                                      orientation='horizontal', expand_x=True,
-                                                      key=f'-CONTROL_LABEL_{i}-', default_value=0.0,
-                                                      enable_events=True)]
-        img_control.append(cntrl)
+    if type(gan) == GAN:
+        label_strings = gan.get_label_strings()
+        for i in range(gan.num_labels):
+            cntrl = [sg.Text(label_strings[i]), sg.Slider(range=(-1.0, 1.0), resolution=0.0001,
+                                                          orientation='horizontal', expand_x=True,
+                                                          key=f'-CONTROL_LABEL_{i}-', default_value=0.0,
+                                                          enable_events=True)]
+            img_control.append(cntrl)
 
-    img_control.append([sg.Button('Reset', key='-RESET_LABEL-')])
-    img_control.append([sg.HorizontalSeparator(pad=((0, 0), (20, 20)))])
+        img_control.append([sg.Button('Reset', key='-RESET_LABEL-')])
+        img_control.append([sg.HorizontalSeparator(pad=((0, 0), (20, 20)))])
 
     img_control.append([sg.Text('random:'), sg.Slider(range=(0.0, 1.0), resolution=0.0001,
                                                       orientation='horizontal', expand_x=True,
@@ -563,8 +458,15 @@ def main():
     parser.add_argument('--small', dest='is_small', action='store_true')
     parser.add_argument('--large', dest='is_small', action='store_false')
     parser.set_defaults(is_small=True)
+    parser.add_argument('--wgan', dest='gan_type', action='store_const', const=GAN_TYPE_WGAN)
+    parser.add_argument('--progan', dest='gan_type', action='store_const', const=GAN_TYPE_PROGAN)
+    parser.set_defaults(gan_type=GAN_TYPE_NONE)
 
     args = parser.parse_args()
+
+    if args.gan_type == GAN_TYPE_NONE:
+        print('you forgot to specifiy the gan type!...')
+        sys.exit()
 
     project_path = os.path.abspath(os.path.join(os.getcwd(), args.project_path))
     print(project_path)
@@ -579,7 +481,16 @@ def main():
 
     # print(size)
 
-    gan = GAN(project_path)
+    if args.gan_type == GAN_TYPE_WGAN:
+        gan = GAN(project_path)
+    elif args.gan_type == GAN_TYPE_PROGAN:
+        gan = ProgressiveGAN(project_path)
+        for path in os.listdir(project_path):
+            if path.startswith('res_'):
+                gan.load_checkpoint(os.path.join(project_path, path))
+    else:
+        gan = None
+
     gen_img_path = os.path.join(project_path, 'images', 'generated')
     # timeline_img_path = os.path.join(project_path, 'images', 'timeline')
 
@@ -635,7 +546,7 @@ def main():
         if len(event) == 2:
             if event[0] == '-IMAGE-':
                 if window == window1:
-                    im_sel_id_browser = update_sel_image_browser(session, project, im_page_browser, event[1], window, IM_GALLERY_SIZE_BROWSER, control_data)
+                    im_sel_id_browser = update_sel_image_browser(session, project, im_page_browser, event[1], window, IM_GALLERY_SIZE_BROWSER, control_data, gan)
                 elif window == window2:
                     im_sel_id_timeline = update_sel_image_timeline(session, project, im_page_timeline, event[1], window, IM_GALLERY_SIZE_TIMELINE)
 

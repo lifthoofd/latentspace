@@ -10,21 +10,21 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
 
     gen_in = keras.layers.concatenate([z, y], axis=3)
 
-    start_size = (1, 2)
+    start_size = (2, 4)
 
-    x = keras.layers.Dense(start_size[0] * start_size[1] * 4096)(gen_in)
-    x = keras.layers.Reshape((start_size[0], start_size[1], 4096))(x)
+    x = keras.layers.Dense(start_size[0] * start_size[1] * 2048)(gen_in)
+    x = keras.layers.Reshape((start_size[0], start_size[1], 2048))(x)
     x = keras.layers.ReLU()(x)
 
     # 2, 4
-    x = keras.layers.Conv2DTranspose(4096,
-                               (3, 3),
-                               strides=(2, 2),
-                               padding='same',
-                               use_bias=False,
-                               kernel_initializer=weight_init)(x)
-    x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.ReLU()(x)
+    # x = keras.layers.Conv2DTranspose(4096,
+    #                            (3, 3),
+    #                            strides=(2, 2),
+    #                            padding='same',
+    #                            use_bias=False,
+    #                            kernel_initializer=weight_init)(x)
+    # x = keras.layers.BatchNormalization()(x)
+    # x = keras.layers.ReLU()(x)
 
     # 4, 8
     x = keras.layers.Conv2DTranspose(2048,
@@ -38,7 +38,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
 
     # 8, 16
     x = keras.layers.Conv2DTranspose(1024,
-                               (3, 3),
+                               (4, 4),
                                strides=(2, 2),
                                padding='same',
                                use_bias=False,
@@ -48,7 +48,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
 
     # 16, 32
     x = keras.layers.Conv2DTranspose(512,
-                               (3, 3),
+                               (4, 4),
                                strides=(2, 2),
                                padding='same',
                                use_bias=False,
@@ -58,7 +58,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
 
     # 32, 64
     x = keras.layers.Conv2DTranspose(256,
-                               (3, 3),
+                               (4, 4),
                                strides=(2, 2),
                                padding='same',
                                use_bias=False,
@@ -68,7 +68,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
 
     # 64, 128
     x = keras.layers.Conv2DTranspose(128,
-                               (3, 3),
+                               (4, 4),
                                strides=(2, 2),
                                padding='same',
                                use_bias=False,
@@ -78,7 +78,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
 
     # 128, 256
     x = keras.layers.Conv2DTranspose(64,
-                               (3, 3),
+                               (4, 4),
                                strides=(2, 2),
                                padding='same',
                                use_bias=False,
@@ -88,7 +88,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
 
     # 256, 512
     x = keras.layers.Conv2DTranspose(32,
-                               (3, 3),
+                               (4, 4),
                                strides=(2, 2),
                                padding='same',
                                use_bias=False,
@@ -96,7 +96,7 @@ def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, asp
     x = keras.layers.BatchNormalization()(x)
     x = keras.layers.ReLU()(x)
 
-    x = keras.layers.Conv2DTranspose(3, (3, 3), strides=(1, 1), padding='same', activation='tanh', use_bias=False,
+    x = keras.layers.Conv2DTranspose(3, (4, 4), strides=(1, 1), padding='same', activation='tanh', use_bias=False,
                                kernel_initializer=weight_init)(x)
 
     return keras.models.Model([z, y], x, name='generator')
@@ -109,44 +109,44 @@ def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ra
     x = keras.layers.concatenate([im, y], axis=3)
 
     # 128, 256
-    x = keras.layers.Conv2D(32, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = keras.layers.Conv2D(32, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = keras.layers.LayerNormalization()(x)
     x = keras.layers.LeakyReLU()(x)
 
     # 64, 128
-    x = keras.layers.Conv2D(64, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = keras.layers.Conv2D(64, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = keras.layers.LayerNormalization()(x)
     x = keras.layers.LeakyReLU()(x)
 
     # 32, 64
-    x = keras.layers.Conv2D(128, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = keras.layers.Conv2D(128, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = keras.layers.LayerNormalization()(x)
     x = keras.layers.LeakyReLU()(x)
 
     # 16, 32
-    x = keras.layers.Conv2D(256, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = keras.layers.Conv2D(256, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = keras.layers.LayerNormalization()(x)
     x = keras.layers.LeakyReLU()(x)
 
     # 8, 16
-    x = keras.layers.Conv2D(512, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = keras.layers.Conv2D(512, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = keras.layers.LayerNormalization()(x)
     x = keras.layers.LeakyReLU()(x)
 
     # 4, 8
-    x = keras.layers.Conv2D(1024, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = keras.layers.Conv2D(1024, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = keras.layers.LayerNormalization()(x)
     x = keras.layers.LeakyReLU()(x)
 
     # 2, 4
-    x = keras.layers.Conv2D(2048, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    x = keras.layers.Conv2D(2048, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
     # x = keras.layers.LayerNormalization()(x)
     x = keras.layers.LeakyReLU()(x)
 
-    # 1, 2
-    x = keras.layers.Conv2D(4096, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
-    # x = keras.layers.LayerNormalization()(x)
-    x = keras.layers.LeakyReLU()(x)
+    # # 1, 2
+    # x = keras.layers.Conv2D(4096, (3, 3), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
+    # # x = keras.layers.LayerNormalization()(x)
+    # x = keras.layers.LeakyReLU()(x)
 
     x = keras.layers.Flatten()(x)
     x = keras.layers.Dense(1)(x)

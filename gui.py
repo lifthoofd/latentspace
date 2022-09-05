@@ -389,7 +389,7 @@ def make_window1(session, project, gan, im_page, size):
     if type(gan) == GAN:
         label_strings = gan.get_label_strings()
         for i in range(gan.num_labels):
-            cntrl = [sg.Text(label_strings[i]), sg.Slider(range=(-100, 100), resolution=0.0001,
+            cntrl = [sg.Text(label_strings[i]), sg.Slider(range=(-100, 100), resolution=1,
                                                           orientation='horizontal', expand_x=True,
                                                           key=f'-CONTROL_LABEL_{i}-', default_value=0,
                                                           enable_events=True)]

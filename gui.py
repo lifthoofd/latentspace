@@ -152,7 +152,7 @@ def update_image_page(session, project, page, window, size, conf):
         return False
 
 
-def update_sel_image_browser(session, project, page, data, window, size, control_data, gan):
+def update_sel_image_browser(session, project, page, data, window, size, control_data, gan, current_z):
     offset = page * (size[0] * size[1])
     im = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (data[0] * size[1])).limit(size[1]).all()[data[1]]
     window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256))
@@ -163,11 +163,19 @@ def update_sel_image_browser(session, project, page, data, window, size, control
             window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][0][i] * 100)
             control_data[0][0][0][i] = y[0][0][0][i]
 
-    return im.id
+    current_z = pickle.loads(im.z)
+
+    return im.id, current_z
     
     
-def update_sel_image_child(window, im):
+def update_sel_image_child(window, session, im, index, current_z):
+    children = session.query(Child).order_by(asc(Child.id)).all()
+
+    current_z = pickle.loads(children[index].z)
+
     window['-SEL_IMAGE-'].update(data=im, size=(512, 256))
+
+    return current_z
 
 
 def update_sel_image_timeline(session, project, page, data, window, size):
@@ -182,14 +190,14 @@ def update_sel_image_timeline(session, project, page, data, window, size):
     return im.id
 
 
-def create_children(session, gan, im_id, data):
-    origin_im = session.query(Image).filter_by(id=im_id).first()
+def create_children(session, gan, im_id, data, current_z):
+    # origin_im = session.query(Image).filter_by(id=im_id).first()
 
     session.query(Child).delete()
     session.commit()
 
-    if origin_im is not None:
-        z = np.array(pickle.loads(origin_im.z)).astype('float32')
+    if current_z is not None:
+        z = current_z
         y = np.array(data[0]).astype('float32')
         z = z.reshape((1, 1, 1, gan.z_dim))
         y = y.reshape((1, 1, 1, gan.num_labels))
@@ -511,6 +519,7 @@ def main():
     im_sel_child = None
     children_ims = []
     export_path = ''
+    current_z = []
 
     project = session.query(Project).filter_by(path=project_path).first()
     if project is None:
@@ -546,7 +555,7 @@ def main():
         if len(event) == 2:
             if event[0] == '-IMAGE-':
                 if window == window1:
-                    im_sel_id_browser = update_sel_image_browser(session, project, im_page_browser, event[1], window, IM_GALLERY_SIZE_BROWSER, control_data, gan)
+                    im_sel_id_browser, current_z = update_sel_image_browser(session, project, im_page_browser, event[1], window, IM_GALLERY_SIZE_BROWSER, control_data, gan, current_z)
                 elif window == window2:
                     im_sel_id_timeline = update_sel_image_timeline(session, project, im_page_timeline, event[1], window, IM_GALLERY_SIZE_TIMELINE)
 
@@ -554,7 +563,7 @@ def main():
                 im_sel_child = event[1]
                 # print(im_sel_child)
                 # print(im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0])
-                update_sel_image_child(window, children_ims[im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0]])
+                current_z = update_sel_image_child(window, session, children_ims[im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0]], im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0], current_z)
 
             if event[0] == '-TIMELINE_ORDER-':
                 if values[event] != '':
@@ -609,7 +618,7 @@ def main():
 
             if event == '-CREATE_CHILDREN-':
                 # print(control_data)
-                create_children(session, gan, im_sel_id_browser, control_data)
+                create_children(session, gan, im_sel_id_browser, control_data, current_z)
                 children_ims = show_children(session, gan, window, size)
 
             if event == '-SAVE_CHILD-':

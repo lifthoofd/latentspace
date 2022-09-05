@@ -160,7 +160,7 @@ def update_sel_image_browser(session, project, page, data, window, size, control
     if type(gan) == GAN:
         y = pickle.loads(im.y)
         for i in range(len(y[0][0][0])):
-            window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][0][i])
+            window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][0][i] * 100)
             control_data[0][0][0][i] = y[0][0][0][i]
 
     return im.id

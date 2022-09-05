@@ -389,18 +389,18 @@ def make_window1(session, project, gan, im_page, size):
     if type(gan) == GAN:
         label_strings = gan.get_label_strings()
         for i in range(gan.num_labels):
-            cntrl = [sg.Text(label_strings[i]), sg.Slider(range=(-1.0, 1.0), resolution=0.0001,
+            cntrl = [sg.Text(label_strings[i]), sg.Slider(range=(-100, 100), resolution=0.0001,
                                                           orientation='horizontal', expand_x=True,
-                                                          key=f'-CONTROL_LABEL_{i}-', default_value=0.0,
+                                                          key=f'-CONTROL_LABEL_{i}-', default_value=0,
                                                           enable_events=True)]
             img_control.append(cntrl)
 
         img_control.append([sg.Button('Reset', key='-RESET_LABEL-')])
         img_control.append([sg.HorizontalSeparator(pad=((0, 0), (20, 20)))])
 
-    img_control.append([sg.Text('random:'), sg.Slider(range=(0.0, 1.0), resolution=0.0001,
+    img_control.append([sg.Text('random:'), sg.Slider(range=(0, 100), resolution=1,
                                                       orientation='horizontal', expand_x=True,
-                                                      key='-CONTROL_RANDOM-', default_value=0.5,
+                                                      key='-CONTROL_RANDOM-', default_value=50,
                                                       enable_events=True)])
     img_control.append([sg.Text('children:'), sg.Slider(range=(0, 20), resolution=1,
                                                         orientation='horizontal', expand_x=True,
@@ -597,13 +597,13 @@ def main():
                             im_page_timeline = new_page
 
             if event == '-CONTROL_RANDOM-':
-                control_data[1] = values['-CONTROL_RANDOM-']
+                control_data[1] = float(values['-CONTROL_RANDOM-']) / 100.0
 
             if event == '-CONTROL_CHILDREN-':
                 control_data[2] = values['-CONTROL_CHILDREN-']
 
             if event.startswith('-CONTROL_LABEL_'):
-                data = values[event]
+                data = float(values[event]) / 100.0
                 index = int(event.replace('-CONTROL_LABEL_', '').replace('-', ''))
                 control_data[0][0][0][index] = data
 

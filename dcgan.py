@@ -12,8 +12,7 @@ import subprocess
 import argparse
 
 from dataset import DatasetPipeline
-# import dcgan.models as models
-import alt_models as models
+import models as models
 
 
 SUMMARY_FREQ = 4
@@ -23,12 +22,10 @@ class DCGAN:
     def __init__(self, config):
         self.num_epochs = int(config['num_epochs'])
 
-        self.batch_size = 128
+        self.batch_size = int(config['batch_size'])
         self.z_dim = 100
         self.learning_rate_gen = float(config['learning_rate_gen'])
         self.learning_rate_disc = float(config['learning_rate_disc'])
-        self.bn_momentum = 0.8
-        self.lr_slope = 0.2
         self.log_freq = 1
         self.checkpoint_freq = 5
         self.num_images_in_row = 10
@@ -37,8 +34,7 @@ class DCGAN:
         self.image_size_x = int(config['image_size_x'])
         self.image_size_y = int(config['image_size_y'])
         self.image_size = (self.image_size_y, self.image_size_x)
-        self.aspect = 0
-        self.filters = 1024
+        self.filters = int(config['filters'])
         self.ckpt_path = str(config['ckpt_path'])
         self.samples_path = str(config['samples_path'])
         self.images_path = os.path.join(str(config['images_path']), 'train')
@@ -80,9 +76,9 @@ class DCGAN:
         self.cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
         # make generator
-        self.generator = models.make_generator_model(self.num_labels, self.z_dim, self.weight_init, self.bn_momentum, self.image_size, self.aspect, self.filters)
+        self.generator = models.make_generator_model(self.num_labels, self.z_dim, self.weight_init, self.image_size, self.filters)
         # make discriminator
-        self.discriminator = models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size, self.lr_slope, self.aspect, self.filters)
+        self.discriminator = models.make_discriminator_model(self.num_labels, self.weight_init, self.image_size, self.filters)
 
         # print summaries
         self.generator.summary()
@@ -181,11 +177,6 @@ class DCGAN:
         y_real = self.one_hot(labels, self.num_labels)
         _, y_real_expanded = self.expand_labels(labels, self.num_labels)
 
-        # disc_loss = 0
-
-        # for _ in range(self.n_critics):
-        #     disc_loss = self.train_d(imgs, y_real, y_real_expanded)
-
         disc_loss = self.train_d(imgs, y_real, y_real_expanded)
         if step % self.n_critics == 0:
             gen_loss = self.train_g()
@@ -277,9 +268,6 @@ class DCGAN:
                     self.progress['step'] = int(step)
                     self.checkpoint.step.assign_add(1)
 
-                    # if not self.is_training:
-                    #     break
-
                 # save some images
                 self.generate_and_save_images(self.generator, epoch, self.num_labels, seed)
 
@@ -342,12 +330,12 @@ class DCGAN:
             for i, image in enumerate(images):
                 img[j * (h + padding): j * (h + padding) + h, i * (w + padding): i * (w + padding) + w, ...] = image
 
-                im_path = os.path.join(self.images_path, str(i))
-                if not os.path.isdir(im_path):
-                    os.mkdir(im_path)
-                now = datetime.datetime.now(datetime.timezone.utc)
-                fn = now.strftime('%Y%m%d_%H%M%S') + '.png'
-                tf.io.write_file(os.path.join(im_path, fn), tf.image.encode_png(tf.cast(image, tf.uint8)))
+                # im_path = os.path.join(self.images_path, str(i))
+                # if not os.path.isdir(im_path):
+                #     os.mkdir(im_path)
+                # now = datetime.datetime.now(datetime.timezone.utc)
+                # fn = now.strftime('%Y%m%d_%H%M%S') + '.png'
+                # tf.io.write_file(os.path.join(im_path, fn), tf.image.encode_png(tf.cast(image, tf.uint8)))
             # time.sleep(1)
 
         file_name = 'epoch_{:04d}.png'.format(epoch)
@@ -362,6 +350,8 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dataset_name', type=str, help='dataset name, mainly used for backend related processes, is required but can be anything')
     parser.add_argument('-x', '--image_size_x', type=int, default=512, help='the width of the images in the dataset')
     parser.add_argument('-y', '--image_size_y', type=int, default=256, help='the height of the images in the dataset')
+    parser.add_argument('-f', '--filters', type=int, default=1024, help='the maximum amount of filters we use')
+    parser.add_argument('-b', '--batch_size', type=int, default=128, help='the batch size used')
     parser.add_argument('-P', '--project_path', type=str, help='the path where you want to store all things related to this latent space project')
     parser.add_argument('-c', '--n_critics', type=int, default=5, help='the number of critics')
     parser.add_argument('-g', '--gp_mult', type=int, default=10, help='gradient penalty multiplier')

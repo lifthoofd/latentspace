@@ -1,74 +1,57 @@
-from tensorflow.python.keras import layers
-from tensorflow.python.keras import models
+# from tensorflow.keras import layers
+# from tensorflow.keras import models
+from tensorflow import keras
 from math import log, pow
 
-ASPECT_16_9 = 0
-ASPECT_1_1 = 1
-ASPECT_16_10 = 2
+
+def make_generator_model(y_dim, z_dim, weight_init, image_size, filters=1024):
+    z = keras.layers.Input(shape=(1, 1, z_dim))
+    y = keras.layers.Input(shape=(1, 1, y_dim,))
+
+    gen_in = keras.layers.concatenate([z, y], axis=3)
+
+    start_size = (2, 4)
+
+    steps = log(image_size[1], 2) - log(4, 2)
+
+    x = keras.layers.Dense(start_size[0] * start_size[1] * filters)(gen_in)
+    x = keras.layers.Reshape((start_size[0], start_size[1], filters))(x)
+    x = keras.layers.ReLU()(x)
+
+    for i in range(int(steps)):
+        dim = filters // pow(2, i)
+        x = keras.layers.Conv2DTranspose(dim,
+                                         (3, 3),
+                                         strides=(2, 2),
+                                         padding='same',
+                                         use_bias=False,
+                                         kernel_initializer=weight_init)(x)
+        x = keras.layers.BatchNormalization()(x)
+        x = keras.layers.ReLU()(x)
+
+    x = keras.layers.Conv2DTranspose(3, (3, 3), strides=(1, 1), padding='same', activation='tanh', use_bias=False,
+                               kernel_initializer=weight_init)(x)
+
+    return keras.models.Model([z, y], x, name='generator')
 
 
-def make_generator_model(y_dim, z_dim, weight_init, bn_momentum, image_size, aspect_ratio, filters=64):
-    z = layers.Input(shape=(1, 1, z_dim))
-    y = layers.Input(shape=(1, 1, y_dim,))
+def make_discriminator_model(y_dim, weight_init, image_size, filters=1024):
+    im = keras.layers.Input(shape=(image_size[0], image_size[1], 3))
+    y = keras.layers.Input(shape=(image_size[0], image_size[1], y_dim))
 
-    gen_in = layers.concatenate([z, y], axis=3)
+    steps = log(image_size[1], 2) - log(4, 2)
 
-    if aspect_ratio == ASPECT_16_9:
-        start_size = (3, 8)
-        steps = int(log(image_size[1], 2)) - int(log(8, 2))
-        dim_mul = 16
-    elif aspect_ratio == ASPECT_16_10:
-        start_size = (5, 8)
-        steps = int(log(image_size[1], 2)) - int(log(8, 2))
-        dim_mul = 32
-    else:
-        start_size = (8, 8)
-        steps = int(log(image_size[1], 2)) - int(log(8, 2))
-        dim_mul = 32
+    x = keras.layers.concatenate([im, y], axis=3)
 
-    dim = filters
+    for i in range(int(steps)):
+        inv_i = abs(i - steps) - 1
+        dim = filters // pow(2, inv_i)
+        x = keras.layers.Conv2D(dim, (3, 3), strides=(2, 2), padding='same', use_bias=False,
+                                kernel_initializer=weight_init)(x)
+        x = keras.layers.LeakyReLU()(x)
 
-    x = layers.Dense(start_size[0] * start_size[1] * (dim * dim_mul))(gen_in)
-    x = layers.Reshape((start_size[0], start_size[1], (dim * dim_mul)))(x)
-    x = layers.ReLU()(x)
+    x = keras.layers.Flatten()(x)
+    x = keras.layers.Dense(1)(x)
 
-    for i in range(steps):
-        dim_mul //= 2
-        if i == 0 and aspect_ratio == ASPECT_16_9:
-            x = layers.Conv2DTranspose(dim * dim_mul, (4, 4), strides=(3, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
-        else:
-            x = layers.Conv2DTranspose(dim * dim_mul, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
-        x = layers.BatchNormalization()(x)
-        # x = layers.BatchNormalization(momentum=bn_momentum)(x)
-        x = layers.ReLU()(x)
+    return keras.models.Model([im, y], x, name='discriminator')
 
-    x = layers.Conv2DTranspose(3, (4, 4), strides=(1, 1), padding='same', activation='tanh', use_bias=False, kernel_initializer=weight_init)(x)
-
-    return models.Model([z, y], x, name='generator')
-
-
-def make_discriminator_model(y_dim, weight_init, image_size, lr_slope, aspect_ratio, filters=64):
-    im = layers.Input(shape=(image_size[0], image_size[1], 3))
-    y = layers.Input(shape=(image_size[0], image_size[1], y_dim))
-
-    x = layers.concatenate([im, y], axis=3)
-
-    if aspect_ratio == ASPECT_16_9:
-        steps = (int(log(image_size[1], 2)) - int(log(8, 2)))
-    elif aspect_ratio == ASPECT_16_10:
-        steps = int(log(image_size[1], 2)) - int(log(8, 2))
-    else:
-        steps = int(log(image_size[1], 2)) - int(log(8, 2))
-
-    dim = filters
-
-    for i in range(steps):
-        dim_mul = int(pow(2, i))
-        x = layers.Conv2D(dim * dim_mul, (4, 4), strides=(2, 2), padding='same', use_bias=False, kernel_initializer=weight_init)(x)
-        # x = layers.LayerNormalization()(x)
-        x = layers.LeakyReLU(alpha=lr_slope)(x)
-
-    x = layers.Flatten()(x)
-    x = layers.Dense(1)(x)
-
-    return models.Model([im, y], x, name='discriminator')

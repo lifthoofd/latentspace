@@ -38,7 +38,7 @@ class DCGAN:
         self.image_size_y = int(config['image_size_y'])
         self.image_size = (self.image_size_y, self.image_size_x)
         self.aspect = 0
-        self.filters = 64
+        self.filters = 1024
         self.ckpt_path = str(config['ckpt_path'])
         self.samples_path = str(config['samples_path'])
         self.images_path = os.path.join(str(config['images_path']), 'train')

@@ -144,3 +144,4 @@ logs/
 images/
 test_project/
 dataset/
+*.swp

@@ -300,7 +300,7 @@ def slerp_interp(points, step_count):
 
     steps = int(step_count / (len(points) - 1))
     vectors = list()
-    for i in range(len(points) - 2):
+    for i in range(len(points) - 1):
         ratios = np.linspace(0., 1., num=steps)
         for ratio in ratios:
             v = slerp(ratio, points[i], points[i+1])

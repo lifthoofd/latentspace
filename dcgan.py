@@ -267,13 +267,16 @@ class DCGAN:
                     self.progress['epoch'] = int(epoch)
                     self.progress['step'] = int(step)
                     self.checkpoint.step.assign_add(1)
-
+                
                 # save some images
-                self.generate_and_save_images(self.generator, epoch, self.num_labels, seed)
+                if step % 50 == 0:
+                    self.generate_and_save_images(self.generator, epoch, self.num_labels, seed)
 
                 if (epoch + 1) % self.checkpoint_freq == 0:
+                    print("saving checkpoint...")
                     ckpt_save_path = self.checkpoint_manager.save()
                     self.generator.save(os.path.join(conf['project_path'], 'generator.h5'))
+                    print("checkpoint saved!")
 
                 self.checkpoint.epoch.assign(epoch)
 

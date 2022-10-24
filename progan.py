@@ -1,4 +1,5 @@
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 import argparse
 import tensorflow as tf
 from tensorflow.keras import Model
@@ -27,9 +28,10 @@ from glob import glob
 from functools import partial
 import time
 
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+
 PATH = "/home/geert/Desktop/dataset/"
 BUFFER_SIZE = 200
-IMAGE_RESOLUTION = 512
 
 BATCH_SIZE = {2: 16, 3: 16, 4: 16, 5: 16, 6: 16, 7: 8, 8: 4, 9: 4, 10:4}
 TRAIN_STEP_RATIO = {k: BATCH_SIZE[2]/v for k, v in BATCH_SIZE.items()}
@@ -594,7 +596,7 @@ if __name__ == '__main__':
     train_dataset_list = tf.data.Dataset.from_tensor_slices(train_images)
     n_workers = tf.data.experimental.AUTOTUNE
 
-    for log2_res in range(2, int(np.log2(IMAGE_RESOLUTION))+1):
+    for log2_res in range(2, int(np.log2(args.target_x))+1):
         res = 2**log2_res
         temp = train_dataset_list.map(partial(load, res),  num_parallel_calls=n_workers)
 

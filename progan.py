@@ -513,7 +513,8 @@ class ProgressiveGAN():
         plot_images(images, log2_res, os.path.join(self.samples_path, f'{prefix}.jpg'))
         
     def load_checkpoint(self, path):
-        max_log2res = int(max([os.path.basename(d).split('_')[-1] for d in glob(path+'/d_*')]))
+        max_log2res = max([int(os.path.basename(d).split('_')[-1]) for d in glob(path+'/d_*')])
+        print(f"MAXIMUM_LOG2RES: {max_log2res}")
         for i in range(2, max_log2res+1):
             self.to_rgb[i] = tf.keras.models.load_model(f'{path}/to_rgb_{i}', custom_objects={'Conv2D': Conv2D, 'FadeIn': FadeIn})
             self.from_rgb[i] = tf.keras.models.load_model(f'{path}/from_rgb_{i}', custom_objects={'Conv2D': Conv2D, 'FadeIn': FadeIn})

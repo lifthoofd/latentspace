@@ -359,11 +359,14 @@ def export_timeline(gan, ims, frames, loop, interp_method, path, window):
     else:
         y_seq = np.asarray([])
 
-    if not os.path.isdir(path):
-        os.makedirs(path)
-    else:
-        shutil.rmtree(path)
-        os.makedirs(path)
+    path = os.path.join(path, datetime.now().strftime("%Y%d%m_%H%M%S"))
+    os.makedirs(path)
+
+   # if not os.path.isdir(path):
+   #     os.makedirs(path)
+   # else:
+   #     shutil.rmtree(path)
+   #     os.makedirs(path)
 
     # TODO: combine the below two loops
     # gen_ims = []

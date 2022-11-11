@@ -269,7 +269,7 @@ class DCGAN:
                     self.checkpoint.step.assign_add(1)
                 
                 # save some images
-                if step % 50 == 0:
+                if epoch % 50 == 0:
                     self.generate_and_save_images(self.generator, epoch, self.num_labels, seed)
 
                 if (epoch + 1) % self.checkpoint_freq == 0:

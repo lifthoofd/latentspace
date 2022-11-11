@@ -30,6 +30,7 @@ class DatasetPipeline:
         ds = ds.map(lambda im, label: self.preprocess_image(im, label), AUTOTUNE)
         ds = self.dataset_cache(ds)
         ds = ds.shuffle(buffer_size=self.batch_size * 10)
+        # ds = self.dataset_cache(ds)
         ds = ds.batch(self.batch_size, drop_remainder=True).prefetch(buffer_size=AUTOTUNE)
         return ds
 

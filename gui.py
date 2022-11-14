@@ -152,10 +152,10 @@ def update_image_page(session, project, page, window, size, conf):
         return False
 
 
-def update_sel_image_browser(session, project, page, data, window, size, control_data, gan, current_z):
+def update_sel_image_browser(session, project, page, data, window, size, control_data, gan, current_z, config):
     offset = page * (size[0] * size[1])
     im = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (data[0] * size[1])).limit(size[1]).all()[data[1]]
-    window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256))
+    window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256), subsample=config['sample_big'])
 
     if type(gan) == GAN:
         y = pickle.loads(im.y)
@@ -168,20 +168,20 @@ def update_sel_image_browser(session, project, page, data, window, size, control
     return im.id, current_z
     
     
-def update_sel_image_child(window, session, im, index, current_z):
+def update_sel_image_child(window, session, im, index, current_z, config):
     children = session.query(Child).order_by(asc(Child.id)).all()
 
     current_z = pickle.loads(children[index].z)
 
-    window['-SEL_IMAGE-'].update(data=im, size=(512, 256))
+    window['-SEL_IMAGE-'].update(data=im, size=(512, 256), subsample=config['sample_big'])
 
     return current_z
 
 
-def update_sel_image_timeline(session, project, page, data, window, size):
+def update_sel_image_timeline(session, project, page, data, window, size, config):
     offset = page * (size[0] * size[1])
     im = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (data[0] * size[1])).limit(size[1]).all()[data[1]]
-    window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256))
+    window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256), subsample=config['sample_big'])
 
     # y = pickle.loads(im.y)
     # for i in range(len(y[0][0])):
@@ -565,15 +565,15 @@ def main():
         if len(event) == 2:
             if event[0] == '-IMAGE-':
                 if window == window1:
-                    im_sel_id_browser, current_z = update_sel_image_browser(session, project, im_page_browser, event[1], window, IM_GALLERY_SIZE_BROWSER, control_data, gan, current_z)
+                    im_sel_id_browser, current_z = update_sel_image_browser(session, project, im_page_browser, event[1], window, IM_GALLERY_SIZE_BROWSER, control_data, gan, current_z, size)
                 elif window == window2:
-                    im_sel_id_timeline = update_sel_image_timeline(session, project, im_page_timeline, event[1], window, IM_GALLERY_SIZE_TIMELINE)
+                    im_sel_id_timeline = update_sel_image_timeline(session, project, im_page_timeline, event[1], window, IM_GALLERY_SIZE_TIMELINE, size)
 
             if event[0] == '-IMAGE_CHILDREN-':
                 im_sel_child = event[1]
                 # print(im_sel_child)
                 # print(im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0])
-                current_z = update_sel_image_child(window, session, children_ims[im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0]], im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0], current_z)
+                current_z = update_sel_image_child(window, session, children_ims[im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0]], im_sel_child[1] * IM_CHILDREN_SIZE[0] + im_sel_child[0], current_z, size)
 
             if event[0] == '-TIMELINE_ORDER-':
                 if values[event] != '':

@@ -115,13 +115,21 @@ def init_img_folder(gan, path, project, session):
             session.commit()
 
 
-def get_image_page(session, project, page, size, conf):
+def get_image_page(session, project, page, size, conf, timelines=[]):
     offset = page * (size[0] * size[1])
     rows = [[sg.Text('Images:')]]
+    
+    tl_im_ids = [tl.image.id for tl in timelines]
 
     for i in range(size[0]):
         ims = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (i * size[1])).limit(size[1]).all()
-        row = [sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small']) for j, im in enumerate(ims)]
+        row = []
+        for j, im in enumerate(ims):
+            if im.id in tl_im_ids:
+                row.append(sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small']), button_color='#005CFF')
+            else:
+                row.append(sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small']), button_color='#FFE400')
+        #row = [sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small']) for j, im in enumerate(ims)]
         rows.append(row)
 
     cntrl_row = [sg.Button('Previous Page', key='-PREV_PAGE-', enable_events=True),
@@ -464,11 +472,11 @@ def make_window1(session, project, gan, im_page, size):
     return sg.Window('Image Browser', layout, size=size['size'], finalize=True)
 
 
-def make_window2(session, project, im_page, size):
+def make_window2(session, project, im_page, size, timelines=[]):
     img_sel = [[sg.Text('Selected image:')],
                [sg.Image(key='-SEL_IMAGE-', size=(512, 256), subsample=size['sample_big'])],
                [sg.Button('Add To Timeline', key='-ADD_TO_TIMELINE-', enable_events=True)]]
-    img_browser_row = get_image_page(session, project, im_page, IM_GALLERY_SIZE_TIMELINE, size)
+    img_browser_row = get_image_page(session, project, im_page, IM_GALLERY_SIZE_TIMELINE, size, timelines)
     timeline = []
     for i in range(IM_GALLERY_SIZE_TIMELINE[1]):
         item = sg.Column([[sg.Image(filename=PLACEHOLDER_IM_PATH, size=(128, 64), key=('-TIMELINE_IMAGE-', i), subsample=size['sample_small'])],
@@ -580,7 +588,7 @@ def main():
     sg.theme('DarkAmber')
 
     # # Create the Windows
-    window2, window1= make_window2(session, project, im_page_timeline, size), make_window1(session, project, gan, im_page_browser, size)
+    window2, window1= make_window2(session, project, im_page_timeline, size, timelines), make_window1(session, project, gan, im_page_browser, size)
 
     update_timeline(window2, timelines, timeline_offset, size)
 

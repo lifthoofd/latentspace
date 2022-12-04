@@ -195,7 +195,7 @@ def create_children(session, gan, im_id, data, current_z):
     session.commit()
 
     rand_amt = data[1]
-    img_amt = data[2]
+    img_amt = int(data[2])
     
     y = np.array(data[0]).astype('float32')
     y = y.reshape((1, 1, 1, gan.num_labels))

@@ -177,7 +177,7 @@ def update_sel_image_browser(session, project, page, data, window, size, control
         for j in range(size[1]):
             window[('-IMAGE-', (i, j))].update(button_color='#FFE400')
     
-    window[('-IMAGE-', (data[0], data[1]))].update(button_color='#FF0000')
+    window[('-IMAGE-', (data[0], data[1]))].update(button_color='#005CFF')
 
     if type(gan) == GAN:
         y = pickle.loads(im.y)

@@ -143,7 +143,11 @@ def update_image_page(session, project, page, window, size, conf, selected_id):
         ims = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (i * size[1])).limit(size[1]).all()
         ims_added += len(ims)
         for j, im in enumerate(ims):
-            window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FF0000')
+            if im.id == selected_id:
+                window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FF0000')
+            else:
+                window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FFE400')
+                
 
     if ims_added > 0:
         window['-CURR_PAGE_TEXT-'].update(f'Current Page: {page + 1}')
@@ -156,6 +160,12 @@ def update_sel_image_browser(session, project, page, data, window, size, control
     offset = page * (size[0] * size[1])
     im = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (data[0] * size[1])).limit(size[1]).all()[data[1]]
     window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256), subsample=config['sample_big'])
+    
+    for i in range(size[0]):
+        for j in range(size[1]):
+            window[('-IMAGE-', (i, j))].update(button_color='#FF0000')
+    
+    window[('-IMAGE-', (data[0], data[1]))].update(button_color='#FFE400')
 
     if type(gan) == GAN:
         y = pickle.loads(im.y)
@@ -183,6 +193,11 @@ def update_sel_image_timeline(session, project, page, data, window, size, config
     im = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (data[0] * size[1])).limit(size[1]).all()[data[1]]
     window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256), subsample=config['sample_big'])
 
+    for i in range(size[0]):
+        for j in range(size[1]):
+            window[('-IMAGE-', (i, j))].update(button_color='#FF0000')
+    
+    window[('-IMAGE-', (data[0], data[1]))].update(button_color='#FFE400')
     # y = pickle.loads(im.y)
     # for i in range(len(y[0][0])):
     #     window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][i])

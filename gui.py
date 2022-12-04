@@ -126,9 +126,9 @@ def get_image_page(session, project, page, size, conf, timelines=[]):
         row = []
         for j, im in enumerate(ims):
             if im.id in tl_im_ids:
-                row.append(sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small']), button_color='#005CFF')
+                row.append(sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#005CFF'))
             else:
-                row.append(sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small']), button_color='#FFE400')
+                row.append(sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FFE400'))
         #row = [sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small']) for j, im in enumerate(ims)]
         rows.append(row)
 

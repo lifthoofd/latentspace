@@ -598,7 +598,7 @@ def main():
                 if window == window1:
                     im_sel_id_browser, current_z = update_sel_image_browser(session, project, im_page_browser, event[1], window, IM_GALLERY_SIZE_BROWSER, control_data, gan, current_z, size)
                 elif window == window2:
-                    im_sel_id_timeline = update_sel_image_timeline(session, project, im_page_timeline, event[1], window, IM_GALLERY_SIZE_TIMELINE, size)
+                    im_sel_id_timeline = update_sel_image_timeline(session, project, im_page_timeline, event[1], window, IM_GALLERY_SIZE_TIMELINE, size, timelines)
 
             if event[0] == '-IMAGE_CHILDREN-':
                 im_sel_child = event[1]

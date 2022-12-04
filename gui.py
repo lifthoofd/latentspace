@@ -192,14 +192,19 @@ def update_sel_image_child(window, session, im, index, current_z, config):
     return current_z
 
 
-def update_sel_image_timeline(session, project, page, data, window, size, config):
+def update_sel_image_timeline(session, project, page, data, window, size, config, timelines):
     offset = page * (size[0] * size[1])
     im = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (data[0] * size[1])).limit(size[1]).all()[data[1]]
     window['-SEL_IMAGE-'].update(filename=im.path, size=(512, 256), subsample=config['sample_big'])
+    tl_im_ids = [tl.image.id for tl in timelines]
 
     for i in range(size[0]):
-        for j in range(size[1]):
-            window[('-IMAGE-', (i, j))].update(button_color='#FFE400')
+        ims = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (i * size[1])).limit(size[1]).all()
+        for j in ims:
+            if j.id in tl_im_ids:
+                window[('-IMAGE-', (i, j))].update(button_color='#005CFF')
+            else:
+                window[('-IMAGE-', (i, j))].update(button_color='#FFE400')
     
     window[('-IMAGE-', (data[0], data[1]))].update(button_color='#FF0000')
     # y = pickle.loads(im.y)

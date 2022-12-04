@@ -30,7 +30,7 @@ WINDOW_SMALL = {'size': (1200, 1000), 'sample_small': 4, 'sample_big': 2}
 
 IM_GALLERY_SIZE_BROWSER = (5, 4)
 IM_GALLERY_SIZE_TIMELINE = (5, 8)
-IM_CHILDREN_SIZE = (10, 4)
+IM_CHILDREN_SIZE = (8, 4)
 
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 DATABASE_PATH = os.path.join(BASE_PATH, 'gui.db')
@@ -420,7 +420,7 @@ def make_window1(session, project, gan, im_page, size):
                                                       orientation='horizontal', expand_x=True,
                                                       key='-CONTROL_RANDOM-', default_value=50,
                                                       enable_events=True)])
-    img_control.append([sg.Text('children:'), sg.Slider(range=(0, 40), resolution=1,
+    img_control.append([sg.Text('children:'), sg.Slider(range=(0, 32), resolution=1,
                                                         orientation='horizontal', expand_x=True,
                                                         key='-CONTROL_CHILDREN-', default_value=10,
                                                         enable_events=True)])

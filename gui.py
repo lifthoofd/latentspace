@@ -204,9 +204,9 @@ def create_children(session, gan, im_id, data, current_z):
     if z is not None:
         z = z.reshape((1, 1, 1, gan.z_dim))
 
-    for i in range(amount):
+    for i in range(img_amt):
         if z is not None:
-            new_z = z + np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32') * rand
+            new_z = z + np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32') * rand_amt
         else:
             new_z = np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32')
         

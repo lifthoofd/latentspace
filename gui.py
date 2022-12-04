@@ -126,7 +126,7 @@ def get_image_page(session, project, page, size, conf, timelines=[]):
         row = []
         for j, im in enumerate(ims):
             if im.id in tl_im_ids:
-                row.append(sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#005CFF'))
+                row.append(sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FF0000'))
             else:
                 row.append(sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FFE400'))
         #row = [sg.Button(image_filename=im.path, key=('-IMAGE-', (i, j)), enable_events=True, image_size=(128, 64), image_subsample=conf['sample_small']) for j, im in enumerate(ims)]
@@ -154,9 +154,9 @@ def update_image_page(session, project, page, window, size, conf, selected_id, t
         ims_added += len(ims)
         for j, im in enumerate(ims):
             if im.id == selected_id:
-                window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FF0000')
-            elif im.id in tl_im_ids:
                 window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#005CFF')
+            elif im.id in tl_im_ids:
+                window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FF0000')
             else:
                 window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FFE400')
                 
@@ -210,11 +210,11 @@ def update_sel_image_timeline(session, project, page, data, window, size, config
         ims = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (i * size[1])).limit(size[1]).all()
         for j, _im in enumerate(ims):
             if _im.id in tl_im_ids:
-                window[('-IMAGE-', (i, j))].update(button_color='#005CFF')
+                window[('-IMAGE-', (i, j))].update(button_color='#FF0000')
             else:
                 window[('-IMAGE-', (i, j))].update(button_color='#FFE400')
     
-    window[('-IMAGE-', (data[0], data[1]))].update(button_color='#FF0000')
+    window[('-IMAGE-', (data[0], data[1]))].update(button_color='#005CFF')
     # y = pickle.loads(im.y)
     # for i in range(len(y[0][0])):
     #     window[f'-CONTROL_LABEL_{i}-'].update(value=y[0][0][i])

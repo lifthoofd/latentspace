@@ -200,8 +200,8 @@ def update_sel_image_timeline(session, project, page, data, window, size, config
 
     for i in range(size[0]):
         ims = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (i * size[1])).limit(size[1]).all()
-        for j in ims:
-            if j.id in tl_im_ids:
+        for j, _im in enumrate(ims):
+            if _im.id in tl_im_ids:
                 window[('-IMAGE-', (i, j))].update(button_color='#005CFF')
             else:
                 window[('-IMAGE-', (i, j))].update(button_color='#FFE400')

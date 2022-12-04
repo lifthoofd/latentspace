@@ -30,7 +30,7 @@ WINDOW_SMALL = {'size': (1200, 1000), 'sample_small': 4, 'sample_big': 2}
 
 IM_GALLERY_SIZE_BROWSER = (5, 4)
 IM_GALLERY_SIZE_TIMELINE = (5, 8)
-IM_CHILDREN_SIZE = (8, 4)
+IM_CHILDREN_SIZE = (10, 4)
 
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 DATABASE_PATH = os.path.join(BASE_PATH, 'gui.db')
@@ -196,7 +196,8 @@ def create_children(session, gan, im_id, data, current_z):
 
     rand_amt = data[1]
     img_amt = int(data[2])
-    
+    rand_mult = data[3]
+
     y = np.array(data[0]).astype('float32')
     y = y.reshape((1, 1, 1, gan.num_labels))
     z = current_z
@@ -206,7 +207,7 @@ def create_children(session, gan, im_id, data, current_z):
 
     for i in range(img_amt):
         if z is not None:
-            new_z = z + np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32') * rand_amt
+            new_z = z + np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32') * (rand_amt * rand_mult)
         else:
             new_z = np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32')
         
@@ -531,7 +532,7 @@ def main():
     timeline_interp = TIMELINE_INTERP_LINEAR
     timeline_frames = 1000
     timeline_loop = True
-    control_data = [[[[0. for _ in range(gan.num_labels)]]], 0.5, 10]
+    control_data = [[[[0. for _ in range(gan.num_labels)]]], 0.5, 10, 1]
     im_sel_child = None
     children_ims = []
     export_path = ''
@@ -624,6 +625,9 @@ def main():
             if event == '-CONTROL_RANDOM-':
                 control_data[1] = float(values['-CONTROL_RANDOM-']) / 100.0
 
+            if event == '-CONTROL_RMULT-':
+                control_data[3] = float(values['-CONTROL_RMULT-'])
+            
             if event == '-CONTROL_CHILDREN-':
                 control_data[2] = values['-CONTROL_CHILDREN-']
 

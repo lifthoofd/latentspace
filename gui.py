@@ -131,7 +131,7 @@ def get_image_page(session, project, page, size, conf):
     return rows
 
 
-def update_image_page(session, project, page, window, size, conf):
+def update_image_page(session, project, page, window, size, conf, selected_id):
     ims_added = 0
     offset = page * (size[0] * size[1])
 
@@ -143,7 +143,7 @@ def update_image_page(session, project, page, window, size, conf):
         ims = session.query(Image).filter_by(project=project).order_by(asc(Image.id)).offset(offset + (i * size[1])).limit(size[1]).all()
         ims_added += len(ims)
         for j, im in enumerate(ims):
-            window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'])
+            window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FF0000')
 
     if ims_added > 0:
         window['-CURR_PAGE_TEXT-'].update(f'Current Page: {page + 1}')
@@ -599,11 +599,11 @@ def main():
             if event == '-NEXT_PAGE-':
                 if window == window1:
                     new_page = im_page_browser + 1
-                    if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_BROWSER, size):
+                    if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_BROWSER, size, im_sel_id_browser):
                         im_page_browser = new_page
                 elif window == window2:
                     new_page = im_page_timeline + 1
-                    if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE, size):
+                    if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE, size, im_sel_id_timeline):
                         im_page_timeline = new_page
 
             if event == '-PREV_PAGE-':
@@ -612,14 +612,14 @@ def main():
                     if im_page_browser <= 0:
                         im_page_browser = 0
                     else:
-                        if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_BROWSER, size):
+                        if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_BROWSER, size, im_sel_id_browser):
                             im_page_browser = new_page
                 elif window == window2:
                     new_page = im_page_timeline - 1
                     if im_page_timeline <= 0:
                         im_page_timeline = 0
                     else:
-                        if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE, size):
+                        if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE, size, im_sel_id_timeline):
                             im_page_timeline = new_page
 
             if event == '-CONTROL_RANDOM-':
@@ -647,7 +647,7 @@ def main():
             
             if event == '-SAVE_CHILD-':
                 save_image(session, gan, project, im_sel_child, gen_img_path)
-                update_image_page(session, project, im_page_browser, window, IM_GALLERY_SIZE_BROWSER, size)
+                update_image_page(session, project, im_page_browser, window, IM_GALLERY_SIZE_BROWSER, size, im_sel_id_browser)
 
             if event == '-RESET_LABEL-':
                 for i in range(gan.num_labels):

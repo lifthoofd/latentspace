@@ -30,7 +30,7 @@ WINDOW_SMALL = {'size': (1200, 1000), 'sample_small': 4, 'sample_big': 2}
 
 IM_GALLERY_SIZE_BROWSER = (5, 4)
 IM_GALLERY_SIZE_TIMELINE = (5, 8)
-IM_CHILDREN_SIZE = (5, 4)
+IM_CHILDREN_SIZE = (8, 4)
 
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 DATABASE_PATH = os.path.join(BASE_PATH, 'gui.db')
@@ -213,23 +213,6 @@ def create_children(session, gan, im_id, data, current_z):
         new_child = Child(z=pickle.dumps(new_z), y=pickle.dumps(y))
         session.add(new_child)
         session.commit()
-
-#    if current_z is not None:
-#        z = current_z
-#        y = np.array(data[0]).astype('float32')
-#        z = z.reshape((1, 1, 1, gan.z_dim))
-#        y = y.reshape((1, 1, 1, gan.num_labels))
-#
-#        rand = data[1]
-#        amount = int(data[2])
-#
-#        for i in range(amount):
-#            z_mod = np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32') * rand
-#            new_z = z + z_mod
-#            # print(new_z)
-#            new_child = Child(z=pickle.dumps(new_z), y=pickle.dumps(y))
-#            session.add(new_child)
-#            session.commit()
 
 
 def show_children(session, gan, window, conf):

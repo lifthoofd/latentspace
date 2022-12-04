@@ -647,6 +647,7 @@ def main():
             
             if event == '-SAVE_CHILD-':
                 save_image(session, gan, project, im_sel_child, gen_img_path)
+                update_image_page(session, project, im_page_browser, window, IM_GALLERY_SIZE_BROWSER, size)
 
             if event == '-RESET_LABEL-':
                 for i in range(gan.num_labels):

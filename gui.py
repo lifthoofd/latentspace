@@ -131,9 +131,11 @@ def get_image_page(session, project, page, size, conf):
     return rows
 
 
-def update_image_page(session, project, page, window, size, conf, selected_id):
+def update_image_page(session, project, page, window, size, conf, selected_id, timelines=[]):
     ims_added = 0
     offset = page * (size[0] * size[1])
+    
+    tl_im_ids = [tl.image.id for tl in timelines]
 
     for y in range(size[0]):
         for x in range(size[1]):
@@ -145,6 +147,8 @@ def update_image_page(session, project, page, window, size, conf, selected_id):
         for j, im in enumerate(ims):
             if im.id == selected_id:
                 window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FF0000')
+            elif im.id in tl_im_ids:
+                window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#005CFF')
             else:
                 window[('-IMAGE-', (i, j))].update(image_filename=im.path, image_size=(128, 64), image_subsample=conf['sample_small'], button_color='#FFE400')
                 
@@ -618,7 +622,7 @@ def main():
                         im_page_browser = new_page
                 elif window == window2:
                     new_page = im_page_timeline + 1
-                    if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE, size, im_sel_id_timeline):
+                    if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE, size, im_sel_id_timeline, timelines):
                         im_page_timeline = new_page
 
             if event == '-PREV_PAGE-':
@@ -634,7 +638,7 @@ def main():
                     if im_page_timeline <= 0:
                         im_page_timeline = 0
                     else:
-                        if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE, size, im_sel_id_timeline):
+                        if update_image_page(session, project, new_page, window, IM_GALLERY_SIZE_TIMELINE, size, im_sel_id_timeline, timelines):
                             im_page_timeline = new_page
 
             if event == '-CONTROL_RANDOM-':

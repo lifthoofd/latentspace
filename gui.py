@@ -191,27 +191,45 @@ def update_sel_image_timeline(session, project, page, data, window, size, config
 
 
 def create_children(session, gan, im_id, data, current_z):
-    # origin_im = session.query(Image).filter_by(id=im_id).first()
-
     session.query(Child).delete()
     session.commit()
 
-    if current_z is not None:
-        z = current_z
-        y = np.array(data[0]).astype('float32')
+    rand_amt = data[1]
+    img_amt = data[2]
+    
+    y = np.array(data[0]).astype('float32')
+    y = y.reshape((1, 1, 1, gan.num_labels))
+    z = current_z
+
+    if z is not None:
         z = z.reshape((1, 1, 1, gan.z_dim))
-        y = y.reshape((1, 1, 1, gan.num_labels))
 
-        rand = data[1]
-        amount = int(data[2])
+    for i in range(amount):
+        if z is not None:
+            new_z = z + np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32') * rand
+        else:
+            new_z = np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32')
+        
+        new_child = Child(z=pickle.dumps(new_z), y=pickle.dumps(y))
+        session.add(new_child)
+        session.commit()
 
-        for i in range(amount):
-            z_mod = np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32') * rand
-            new_z = z + z_mod
-            # print(new_z)
-            new_child = Child(z=pickle.dumps(new_z), y=pickle.dumps(y))
-            session.add(new_child)
-            session.commit()
+#    if current_z is not None:
+#        z = current_z
+#        y = np.array(data[0]).astype('float32')
+#        z = z.reshape((1, 1, 1, gan.z_dim))
+#        y = y.reshape((1, 1, 1, gan.num_labels))
+#
+#        rand = data[1]
+#        amount = int(data[2])
+#
+#        for i in range(amount):
+#            z_mod = np.random.normal(size=[1, 1, 1, gan.z_dim]).astype('float32') * rand
+#            new_z = z + z_mod
+#            # print(new_z)
+#            new_child = Child(z=pickle.dumps(new_z), y=pickle.dumps(y))
+#            session.add(new_child)
+#            session.commit()
 
 
 def show_children(session, gan, window, conf):
@@ -409,15 +427,20 @@ def make_window1(session, project, gan, im_page, size):
         img_control.append([sg.Button('Reset', key='-RESET_LABEL-')])
         img_control.append([sg.HorizontalSeparator(pad=((0, 0), (20, 20)))])
 
+
+    img_control.append([sg.Text('multiplier:'), sg.Slider(range=(1, 100), resolution=1,
+                                                      orientation='horizontal', expand_x=True,
+                                                      key='-CONTROL_RMULT-', default_value=1,
+                                                      enable_events=True)])
     img_control.append([sg.Text('random:'), sg.Slider(range=(0, 100), resolution=1,
                                                       orientation='horizontal', expand_x=True,
                                                       key='-CONTROL_RANDOM-', default_value=50,
                                                       enable_events=True)])
-    img_control.append([sg.Text('children:'), sg.Slider(range=(0, 20), resolution=1,
+    img_control.append([sg.Text('children:'), sg.Slider(range=(0, 40), resolution=1,
                                                         orientation='horizontal', expand_x=True,
                                                         key='-CONTROL_CHILDREN-', default_value=10,
                                                         enable_events=True)])
-    img_control.append([sg.Button('Create Children', key='-CREATE_CHILDREN-')])
+    img_control.append([sg.Button('Create Children', key='-CREATE_CHILDREN-'), sg.Button('Random Cousins', key='-RANDOM_CHILDREN-')])
     img_sel = [[sg.Text('Selected image:')], [sg.Image(key='-SEL_IMAGE-', size=(512, 256), subsample=size['sample_big'])],
                [sg.Button('Save Child', key='-SAVE_CHILD-')]]
 
@@ -631,6 +654,10 @@ def main():
                 create_children(session, gan, im_sel_id_browser, control_data, current_z)
                 children_ims = show_children(session, gan, window, size)
 
+            if event == '-RANDOM_CHILDREN-':
+                create_children(session, gan, im_sel_id_browser, control_data, None)
+                children_ims = show_children(session, gan, window, size)
+            
             if event == '-SAVE_CHILD-':
                 save_image(session, gan, project, im_sel_child, gen_img_path)
 

@@ -444,7 +444,7 @@ def make_window1(session, project, gan, im_page, size):
         img_control.append([sg.HorizontalSeparator(pad=((0, 0), (20, 20)))])
 
 
-    img_control.append([sg.Text('multiplier:'), sg.Slider(range=(1, 100), resolution=1,
+    img_control.append([sg.Text('multiplier:'), sg.Slider(range=(1, 10000), resolution=1,
                                                       orientation='horizontal', expand_x=True,
                                                       key='-CONTROL_RMULT-', default_value=1,
                                                       enable_events=True)])
